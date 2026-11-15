@@ -14,7 +14,6 @@ public:
 
 private:
     static void on_html_output(const MD_CHAR* text, MD_SIZE size, void* userdata);
-    static std::string read_file(const std::string& path);
 
     std::filesystem::path markdown_path_;
     std::string html_;

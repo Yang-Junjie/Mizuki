@@ -13,8 +13,6 @@ public:
     std::string const& get_html() const;
 
 private:
-    static std::string read_file(std::filesystem::path const& path);
-
     std::filesystem::path layout_path_;
     std::string page_;
 };
