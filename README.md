@@ -14,10 +14,19 @@
 ./build/bin/mizuki watch
 ```
 
-两个命令都支持指定目录，相对路径以执行命令时所在的目录为准：
+使用 `serve` 可以同时启动本地预览和自动构建，默认访问 `http://127.0.0.1:3939`。修改文件后，在浏览器手动刷新查看，按 Ctrl+C 退出：
+
+```sh
+./build/bin/mizuki serve
+./build/bin/mizuki serve --port 4000
+```
+
+所有命令都支持指定目录，相对路径以执行命令时所在的目录为准：
 
 ```sh
 ./build/bin/mizuki watch --content content --theme themes/default --output dist
 ```
 
-`watch` 每次都调用 Builder 全量构建，失败时打印错误并继续监听。输出目录应放在监听目录之外。删除或重命名源文件后，旧的 HTML 和资源需要手动清理。
+`--port` 仅用于 `serve`，范围为 1–65535，服务只监听本机地址。端口占用时会打印错误并退出。
+
+`watch` 和 `serve` 每次都调用 Builder 全量构建，失败时打印错误并继续监听。输出目录应放在监听目录之外。删除或重命名源文件后，旧的 HTML 和资源需要手动清理。
