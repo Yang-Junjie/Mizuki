@@ -1,4 +1,5 @@
 #include "dev/server.hpp"
+#include "dev/live_reload.hpp"
 #include "dev/watch.hpp"
 
 #include <httplib.h>
@@ -9,7 +10,8 @@
 namespace mizuki {
 
 int serve(BuildOptions const& options, int port) {
-    WatchSession session(options);
+    LiveReload reload;
+    WatchSession session(options, [&reload] { reload.notify_build(); });
     if (!session.valid()) {
         return 1;
     }
@@ -21,6 +23,7 @@ int serve(BuildOptions const& options, int port) {
         spdlog::error("Failed to serve directory: {}", options.output_dir.string());
         return 1;
     }
+    reload.attach(server, options.output_dir);
     // Replace the library's default SO_REUSEPORT so another server cannot share the port.
     server.set_socket_options([](socket_t socket) {
 #ifdef _WIN32

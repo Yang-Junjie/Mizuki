@@ -8,8 +8,8 @@
 
 namespace mizuki {
 
-WatchSession::WatchSession(BuildOptions options)
-    : options_(std::move(options)), builder_(options_),
+WatchSession::WatchSession(BuildOptions options, std::function<void()> on_build)
+    : options_(std::move(options)), builder_(options_), on_build_(std::move(on_build)),
       content_watcher_(options_.content_dir,
                        [this](std::filesystem::path const&) { changed_.store(true); }),
       theme_watcher_(options_.theme_dir,
@@ -33,6 +33,9 @@ void WatchSession::build_if_changed() {
     if (result.success) {
         spdlog::info("Built {} page(s), copied {} asset(s) -> {}", result.pages_built,
                      result.assets_copied, options_.output_dir.string());
+        if (on_build_) {
+            on_build_();
+        }
     } else {
         spdlog::error("Build failed: {}", result.error);
     }

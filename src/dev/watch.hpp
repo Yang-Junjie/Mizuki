@@ -3,13 +3,14 @@
 #include "dev/file_watcher.hpp"
 
 #include <atomic>
+#include <functional>
 #include <stop_token>
 
 namespace mizuki {
 
 class WatchSession {
 public:
-    explicit WatchSession(BuildOptions options);
+    explicit WatchSession(BuildOptions options, std::function<void()> on_build = {});
 
     bool valid() const;
     void build_if_changed();
@@ -18,6 +19,7 @@ public:
 private:
     BuildOptions options_;
     Builder builder_;
+    std::function<void()> on_build_;
     std::atomic<bool> changed_{true};
     FileWatcher content_watcher_;
     FileWatcher theme_watcher_;
