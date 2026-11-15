@@ -1,4 +1,5 @@
 #include "build/builder.hpp"
+#include "dev/watch.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -8,7 +9,10 @@
 namespace {
 
 void print_usage() {
-    std::cout << "Usage: mizuki build [--content DIR] [--theme DIR] [--output DIR]\n"
+    std::cout << "Usage: mizuki <build|watch> [--content DIR] [--theme DIR] [--output DIR]\n"
+                 "\n"
+                 "  build          Build the site once\n"
+                 "  watch          Rebuild when content or theme files change\n"
                  "\n"
                  "  --content DIR  Content directory (default: content)\n"
                  "  --theme DIR    Theme directory (default: themes/default)\n"
@@ -28,7 +32,7 @@ int main(int argc, char** argv) {
         print_usage();
         return 0;
     }
-    if (command != "build") {
+    if (command != "build" && command != "watch") {
         spdlog::error("Unknown command: {}", command);
         print_usage();
         return 1;
@@ -57,6 +61,10 @@ int main(int argc, char** argv) {
         } else {
             options.output_dir = value;
         }
+    }
+
+    if (command == "watch") {
+        return mizuki::watch(options);
     }
 
     mizuki::Builder builder(options);

@@ -36,8 +36,8 @@ private:
         }
     }
 
+    Callback callback_;
     efsw::FileWatcher watcher_;
     efsw::WatchID watch_id_{-1};
-    Callback callback_;
 };
 }
