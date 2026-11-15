@@ -2,14 +2,47 @@
 #include "util/file.hpp"
 
 #include <algorithm>
+#include <array>
 #include <exception>
 #include <utility>
 
 namespace mizuki {
 
+namespace {
+
+std::string escape_html(std::string_view text) {
+    std::string escaped;
+    escaped.reserve(text.size());
+    for (char const ch : text) {
+        switch (ch) {
+            case '&':
+                escaped += "&amp;";
+                break;
+            case '<':
+                escaped += "&lt;";
+                break;
+            case '>':
+                escaped += "&gt;";
+                break;
+            case '"':
+                escaped += "&quot;";
+                break;
+            case '\'':
+                escaped += "&#39;";
+                break;
+            default:
+                escaped += ch;
+                break;
+        }
+    }
+    return escaped;
+}
+
+}  // namespace
+
 Renderer::Renderer(std::filesystem::path layout_path) : layout_path_(std::move(layout_path)) {}
 
-bool Renderer::render(std::string_view content, std::string_view asset_base) {
+bool Renderer::render(std::string_view content, RenderValues const& values) {
     std::string layout;
     try {
         layout = read_file(layout_path_);
@@ -18,31 +51,41 @@ bool Renderer::render(std::string_view content, std::string_view asset_base) {
         return false;
     }
 
-    constexpr std::string_view content_placeholder = "{markdown}";
-    constexpr std::string_view assets_placeholder = "{asset_base}";
-    if (layout.find(content_placeholder) == std::string::npos) {
-        page_.clear();
-        return false;
+    auto const title = escape_html(values.title);
+    auto const date = escape_html(values.date);
+    std::array<std::pair<std::string_view, std::string_view>, 4> const placeholders{{
+        {"{markdown}", content},
+        {"{asset_base}", values.asset_base},
+        {"{title}", title},
+        {"{date}", date},
+    }};
+
+    for (auto const& [token, value] : placeholders) {
+        if (layout.find(token) == std::string::npos) {
+            page_.clear();
+            return false;
+        }
     }
 
     std::string page;
     std::size_t offset = 0;
     while (offset < layout.size()) {
-        auto const content_pos = layout.find(content_placeholder, offset);
-        auto const assets_pos = layout.find(assets_placeholder, offset);
-        auto const next = std::min(content_pos, assets_pos);
-        if (next == std::string::npos) {
+        std::size_t next = std::string_view::npos;
+        std::pair<std::string_view, std::string_view> const* chosen = nullptr;
+        for (auto const& placeholder : placeholders) {
+            auto const position = layout.find(placeholder.first, offset);
+            if (position < next) {
+                next = position;
+                chosen = &placeholder;
+            }
+        }
+        if (chosen == nullptr) {
             page.append(layout, offset, std::string::npos);
             break;
         }
         page.append(layout, offset, next - offset);
-        if (next == content_pos) {
-            page.append(content);
-            offset = next + content_placeholder.size();
-        } else {
-            page.append(asset_base);
-            offset = next + assets_placeholder.size();
-        }
+        page.append(chosen->second);
+        offset = next + chosen->first.size();
     }
     page_ = std::move(page);
     return true;

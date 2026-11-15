@@ -4,6 +4,8 @@
 #include "util/file.hpp"
 #include "util/path.hpp"
 
+#include <spdlog/spdlog.h>
+
 #include <exception>
 #include <utility>
 
@@ -32,11 +34,22 @@ BuildResult Builder::build() const {
             if (is_markdown(file.path())) {
                 destination.replace_extension(".html");
                 Markdown markdown(file.path());
-                auto const asset_base =
-                    fs::path("assets").lexically_relative(relative.parent_path());
-                if (!markdown.to_html() ||
-                    !renderer.render(markdown.get_html(), asset_base.generic_string() + "/")) {
+                if (!markdown.load()) {
+                    result.error = "Failed to render " + file.path().string() + ": " + markdown.error();
+                    return result;
+                }
+                if (markdown.front_matter().draft) {
+                    spdlog::info("Skipping draft: {}", file.path().string());
+                    continue;
+                }
+                auto const asset_base = fs::path("assets").lexically_relative(relative.parent_path());
+                std::string const asset_base_path = asset_base.generic_string() + "/";
+                RenderValues const values{asset_base_path, markdown.front_matter().title, markdown.front_matter().date};
+                if (!markdown.to_html() || !renderer.render(markdown.get_html(), values)) {
                     result.error = "Failed to render " + file.path().string();
+                    if (!markdown.error().empty()) {
+                        result.error += ": " + markdown.error();
+                    }
                     return result;
                 }
                 write_file(destination, renderer.get_html());

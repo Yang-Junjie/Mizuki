@@ -50,6 +50,23 @@ h1 {
   font-size: 2rem;
 }
 
+header {
+  margin-bottom: 2rem;
+}
+
+header h1 {
+  margin: 0 0 0.25em;
+}
+
+header time {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+header time:empty {
+  display: none;
+}
+
 h2 {
   padding-bottom: 0.25em;
   border-bottom: 1px solid var(--border);

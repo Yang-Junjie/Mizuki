@@ -1,4 +1,6 @@
-# Mizuki
+---
+title: Mizuki
+---
 
 欢迎来到 Mizuki，这是一个用 C++ 编写的轻量博客框架。
 

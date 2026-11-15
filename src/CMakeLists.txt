@@ -6,6 +6,7 @@ set(SOURCE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/dev/live_reload.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/dev/server.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/dev/watch.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/parse/front_matter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/parse/markdown.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/render/renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/util/file.cpp
