@@ -1,2 +1,3 @@
 # Mizuki
-a tiny blog framework base on C++
+
+一个用 C++ 编写的轻量博客框架。

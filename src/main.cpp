@@ -1,66 +1,71 @@
-#include "parse/markdown.hpp"
-#include "render/renderer.hpp"
+#include "build/builder.hpp"
 
 #include <spdlog/spdlog.h>
 
-#include <filesystem>
-#include <fstream>
-#include <stdexcept>
-#include <string>
-#include <system_error>
+#include <iostream>
+#include <string_view>
 
 namespace {
 
-void copy_asset(std::filesystem::path const& from, std::filesystem::path const& to) {
-    std::error_code ec;
-    std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing, ec);
-    if (ec) {
-        throw std::runtime_error("Failed to copy " + from.string() + " to " + to.string() + ": " +
-                                 ec.message());
-    }
+void print_usage() {
+    std::cout << "Usage: mizuki build [--content DIR] [--theme DIR] [--output DIR]\n"
+                 "\n"
+                 "  --content DIR  Content directory (default: content)\n"
+                 "  --theme DIR    Theme directory (default: themes/default)\n"
+                 "  --output DIR   Generated site directory (default: dist)\n"
+                 "  --help, -h     Show this help\n";
 }
 
 }  // namespace
 
-int main(int argc, char** args) {
-
+int main(int argc, char** argv) {
     if (argc < 2) {
-        spdlog::error("No arguments provided");
+        print_usage();
+        return 1;
+    }
+    std::string_view const command(argv[1]);
+    if (command == "--help" || command == "-h") {
+        print_usage();
+        return 0;
+    }
+    if (command != "build") {
+        spdlog::error("Unknown command: {}", command);
+        print_usage();
         return 1;
     }
 
-    std::filesystem::path markdown_path(args[1]);
-    std::filesystem::path const theme_root("themes/default");
-
-    mizuki::Markdown markdown(markdown_path);
-    if (!markdown.to_html()) {
-        spdlog::error("Failed to convert markdown: {}", markdown_path.string());
-        return 1;
-    }
-
-    mizuki::Renderer renderer(theme_root / "layouts/post.html");
-    if (!renderer.render(markdown.get_html())) {
-        spdlog::error("Failed to render page for: {}", markdown_path.string());
-        return 1;
-    }
-
-    std::string const& page = renderer.get_html();
-
-    try {
-        std::ofstream html_file("output.html", std::ios::binary);
-        if (!html_file.is_open()) {
-            spdlog::error("Failed to open HTML output file");
+    mizuki::BuildOptions options;
+    for (int index = 2; index < argc; ++index) {
+        std::string_view const option(argv[index]);
+        if (option == "--help" || option == "-h") {
+            print_usage();
+            return 0;
+        }
+        if (option != "--content" && option != "--theme" && option != "--output") {
+            spdlog::error("Unknown option: {}", option);
             return 1;
         }
-        html_file << page;
-        html_file.close();
-
-        copy_asset(theme_root / "assets/css/style.css", "style.css");
-    } catch (std::exception const& e) {
-        spdlog::error("{}", e.what());
-        return 1;
+        if (index + 1 >= argc || std::string_view(argv[index + 1]).starts_with("--")) {
+            spdlog::error("Missing directory value for {}", option);
+            return 1;
+        }
+        auto const* value = argv[++index];
+        if (option == "--content") {
+            options.content_dir = value;
+        } else if (option == "--theme") {
+            options.theme_dir = value;
+        } else {
+            options.output_dir = value;
+        }
     }
 
-    spdlog::info("Rendered {} -> output.html", markdown_path.string());
+    mizuki::Builder builder(options);
+    auto const result = builder.build();
+    if (!result.success) {
+        spdlog::error("Build failed: {}", result.error);
+        return 1;
+    }
+    spdlog::info("Built {} page(s), copied {} asset(s) -> {}", result.pages_built,
+                 result.assets_copied, options.output_dir.string());
     return 0;
 }
