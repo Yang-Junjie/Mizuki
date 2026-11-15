@@ -133,6 +133,10 @@ bool parse_front_matter(std::string_view source, FrontMatter& metadata, std::str
         error = "Invalid front matter: missing required key 'title'";
         return false;
     }
+    if (!has_date || metadata.date.empty()) {
+        error = "Invalid front matter: missing required key 'date'";
+        return false;
+    }
 
     body = remaining;
     return true;
