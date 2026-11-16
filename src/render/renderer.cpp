@@ -1,48 +1,15 @@
 #include "render/renderer.hpp"
 #include "util/file.hpp"
+#include "util/html.hpp"
 
-#include <algorithm>
-#include <array>
 #include <exception>
 #include <utility>
 
 namespace mizuki {
 
-namespace {
-
-std::string escape_html(std::string_view text) {
-    std::string escaped;
-    escaped.reserve(text.size());
-    for (char const ch : text) {
-        switch (ch) {
-            case '&':
-                escaped += "&amp;";
-                break;
-            case '<':
-                escaped += "&lt;";
-                break;
-            case '>':
-                escaped += "&gt;";
-                break;
-            case '"':
-                escaped += "&quot;";
-                break;
-            case '\'':
-                escaped += "&#39;";
-                break;
-            default:
-                escaped += ch;
-                break;
-        }
-    }
-    return escaped;
-}
-
-}  // namespace
-
 Renderer::Renderer(std::filesystem::path layout_path) : layout_path_(std::move(layout_path)) {}
 
-bool Renderer::render(std::string_view content, RenderValues const& values) {
+bool Renderer::render(std::span<TemplateValue const> values) {
     std::string layout;
     try {
         layout = read_file(layout_path_);
@@ -51,17 +18,8 @@ bool Renderer::render(std::string_view content, RenderValues const& values) {
         return false;
     }
 
-    auto const title = escape_html(values.title);
-    auto const date = escape_html(values.date);
-    std::array<std::pair<std::string_view, std::string_view>, 4> const placeholders{{
-        {"{markdown}", content},
-        {"{asset_base}", values.asset_base},
-        {"{title}", title},
-        {"{date}", date},
-    }};
-
-    for (auto const& [token, value] : placeholders) {
-        if (layout.find(token) == std::string::npos) {
+    for (auto const& value : values) {
+        if (value.placeholder.empty() || layout.find(value.placeholder) == std::string::npos) {
             page_.clear();
             return false;
         }
@@ -71,12 +29,12 @@ bool Renderer::render(std::string_view content, RenderValues const& values) {
     std::size_t offset = 0;
     while (offset < layout.size()) {
         std::size_t next = std::string_view::npos;
-        std::pair<std::string_view, std::string_view> const* chosen = nullptr;
-        for (auto const& placeholder : placeholders) {
-            auto const position = layout.find(placeholder.first, offset);
+        TemplateValue const* chosen = nullptr;
+        for (auto const& value : values) {
+            auto const position = layout.find(value.placeholder, offset);
             if (position < next) {
                 next = position;
-                chosen = &placeholder;
+                chosen = &value;
             }
         }
         if (chosen == nullptr) {
@@ -84,8 +42,12 @@ bool Renderer::render(std::string_view content, RenderValues const& values) {
             break;
         }
         page.append(layout, offset, next - offset);
-        page.append(chosen->second);
-        offset = next + chosen->first.size();
+        if (chosen->raw_html) {
+            page.append(chosen->value);
+        } else {
+            page.append(escape_html(chosen->value));
+        }
+        offset = next + chosen->placeholder.size();
     }
     page_ = std::move(page);
     return true;

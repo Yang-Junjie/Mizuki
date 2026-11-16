@@ -1,21 +1,22 @@
 #pragma once
 #include <filesystem>
+#include <span>
 #include <string>
 #include <string_view>
 
 namespace mizuki {
 
-struct RenderValues {
-    std::string_view asset_base;
-    std::string_view title;
-    std::string_view date;
+struct TemplateValue {
+    std::string_view placeholder;
+    std::string_view value;
+    bool raw_html{false};
 };
 
 class Renderer {
 public:
     explicit Renderer(std::filesystem::path layout_path);
 
-    bool render(std::string_view content, RenderValues const& values);
+    bool render(std::span<TemplateValue const> values);
 
     std::string const& get_html() const;
 

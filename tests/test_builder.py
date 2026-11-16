@@ -26,11 +26,11 @@ class BuilderTests(unittest.TestCase):
         self.write_page("index.md", "Home", "Welcome.")
         self.write_page("posts/first.md", "First post", "Original body.")
 
-    def write_page(self, name, title, body, draft=False):
+    def write_page(self, name, title, body, draft=False, date="2026-11-16"):
         path = self.content / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
-            f"---\ntitle: {title}\ndate: 2026-11-16\n"
+            f"---\ntitle: {title}\ndate: {date}\n"
             f"draft: {'true' if draft else 'false'}\n---\n\n{body}\n",
             encoding="utf-8",
         )
@@ -76,6 +76,10 @@ class BuilderTests(unittest.TestCase):
             {"index.html", "posts/first.html", "assets/css/style.css"},
         )
         self.assertIn("Original body.", (self.output / "posts/first.html").read_text())
+        homepage = (self.output / "index.html").read_text()
+        self.assertIn("First post", homepage)
+        self.assertIn('href="posts/first.html"', homepage)
+        self.assertNotIn("Welcome.", homepage)
         self.assertEqual(
             (self.output / "assets/css/style.css").read_bytes(),
             (self.theme / "assets/css/style.css").read_bytes(),
@@ -92,6 +96,9 @@ class BuilderTests(unittest.TestCase):
         self.build()
         self.assertFalse((self.output / "posts/first.html").exists())
         self.assertTrue((self.output / "posts/renamed.html").is_file())
+        homepage = (self.output / "index.html").read_text()
+        self.assertNotIn('href="posts/first.html"', homepage)
+        self.assertIn('href="posts/renamed.html"', homepage)
         (self.content / "posts/renamed.md").unlink()
         self.build()
         self.assertFalse((self.output / "posts/renamed.html").exists())
@@ -103,10 +110,63 @@ class BuilderTests(unittest.TestCase):
         self.write_page("posts/first.md", "First post", "Draft body.", draft=True)
         self.build()
         self.assertFalse((self.output / "posts/first.html").exists())
+        self.assertNotIn("First post", (self.output / "index.html").read_text())
         self.write_page("posts/first.md", "First post", "Published again.")
         self.build()
         self.assertIn("Published again.", (self.output / "posts/first.html").read_text())
+        self.assertIn("First post", (self.output / "index.html").read_text())
         self.assert_no_temporary_directories()
+
+    def test_homepage_template_controls_layout_and_lists_articles_by_date(self):
+        (self.theme / "layouts/home.html").write_text(
+            '<!doctype html><title>Custom home</title><link href="{asset_base}site.css">'
+            '<main><ul>{posts}</ul></main>',
+            encoding="utf-8",
+        )
+        self.write_page(
+            "posts/old.md", "Old & archived", "Old body.", date="2024-01-01 & old"
+        )
+        self.write_page(
+            "posts/nested/latest.md", 'Latest <article> "new"', "Latest body.",
+            date="2026-12-02",
+        )
+        self.write_page(
+            "posts/nested/space #&.md", "Special path", "Special body.", date="2025-01-01"
+        )
+        self.write_page(
+            "posts/draft.md", "Hidden draft", "Draft body.", draft=True, date="2030-01-01"
+        )
+
+        self.build()
+        homepage = (self.output / "index.html").read_text()
+        self.assertTrue(homepage.startswith("<!doctype html><title>Custom home</title>"))
+        self.assertIn('href="posts/nested/latest.html"', homepage)
+        self.assertIn('href="posts/nested/space%20%23%26.html"', homepage)
+        self.assertIn("Latest &lt;article&gt; &quot;new&quot;", homepage)
+        self.assertIn("Old &amp; archived", homepage)
+        self.assertIn("2024-01-01 &amp; old", homepage)
+        self.assertNotIn("Hidden draft", homepage)
+        self.assertLess(
+            homepage.index("Latest &lt;article&gt;"), homepage.index("First post")
+        )
+        self.assertLess(homepage.index("First post"), homepage.index("Special path"))
+        self.assertLess(homepage.index("Special path"), homepage.index("Old &amp; archived"))
+        self.assertEqual(homepage.count("<li class=\"post-item\">"), 4)
+
+    def test_index_markdown_is_not_used_or_validated_for_homepage(self):
+        (self.content / "index.md").write_text("Not valid front matter.", encoding="utf-8")
+        self.build()
+        homepage = (self.output / "index.html").read_text()
+        self.assertIn("First post", homepage)
+        self.assertNotIn("Not valid front matter", homepage)
+
+    def test_homepage_with_no_published_articles_has_empty_list(self):
+        (self.content / "posts/first.md").unlink()
+        self.write_page("posts/draft.md", "Draft only", "Unpublished.", draft=True)
+        self.build()
+        homepage = (self.output / "index.html").read_text()
+        self.assertIn('<ul class="post-list">\n      </ul>', homepage)
+        self.assertNotIn("Draft only", homepage)
 
     def test_deleted_content_and_theme_assets_disappear(self):
         resource = self.content / "images" / "photo.bin"
@@ -128,7 +188,8 @@ class BuilderTests(unittest.TestCase):
         shutil.rmtree(self.theme / "assets")
         self.build()
         self.assertTrue(self.output.is_dir())
-        self.assertEqual(list(self.output.iterdir()), [])
+        self.assertEqual({path.name for path in self.output.iterdir()}, {"index.html"})
+        self.assertIn("<ul class=\"post-list\">", (self.output / "index.html").read_text())
         self.assert_no_temporary_directories()
 
     def test_successful_build_removes_manual_files(self):
@@ -165,6 +226,20 @@ class BuilderTests(unittest.TestCase):
                 self.assertEqual(self.snapshot(), before)
                 self.assert_no_temporary_directories()
 
+    def test_invalid_or_missing_homepage_template_preserves_previous_output(self):
+        self.build()
+        before = self.snapshot()
+        layout = self.theme / "layouts/home.html"
+        for invalid in ("<html>Missing placeholders</html>", None):
+            with self.subTest(template=invalid):
+                if invalid is None:
+                    layout.unlink()
+                else:
+                    layout.write_text(invalid, encoding="utf-8")
+                self.build(success=False)
+                self.assertEqual(self.snapshot(), before)
+                self.assert_no_temporary_directories()
+
     @unittest.skipUnless(os.name == "posix", "POSIX file permissions required")
     def test_failed_asset_copy_preserves_previous_output(self):
         resource = self.content / "image.bin"
@@ -192,12 +267,14 @@ class BuilderTests(unittest.TestCase):
         try:
             if os.access(locked, os.W_OK):
                 self.skipTest("Current user can write directories without write permissions")
-            self.write_page("index.md", "Updated home", "Published despite cleanup warning.")
+            self.write_page("posts/first.md", "Updated post", "Published despite cleanup warning.")
             log = self.build()
             self.assertIn("Failed to remove build directory", log)
             self.assertIn(".mizuki-backup-", log)
+            self.assertIn("Updated post", (self.output / "index.html").read_text())
             self.assertIn(
-                "Published despite cleanup warning.", (self.output / "index.html").read_text()
+                "Published despite cleanup warning.",
+                (self.output / "posts/first.html").read_text(),
             )
             self.assertFalse((self.output / "locked").exists())
             backups = list(self.root.glob("dist.mizuki-backup-*"))

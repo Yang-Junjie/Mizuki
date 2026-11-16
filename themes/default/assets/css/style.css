@@ -67,6 +67,42 @@ header time:empty {
   display: none;
 }
 
+.home-header {
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.home-header p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.post-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.post-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.post-item a {
+  overflow-wrap: anywhere;
+}
+
+.post-item time {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 h2 {
   padding-bottom: 0.25em;
   border-bottom: 1px solid var(--border);
@@ -166,5 +202,11 @@ li.task-list-item {
 
   h2 {
     font-size: 1.35rem;
+  }
+
+  .post-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.1rem;
   }
 }

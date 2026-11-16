@@ -1,6 +1,7 @@
 
 set(SOURCE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/build/article_list.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/build/builder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/build/output_transaction.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/build/paths.cpp
@@ -12,6 +13,7 @@ set(SOURCE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/parse/markdown.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/render/renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/util/file.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/util/html.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/util/path.cpp
 )
 
