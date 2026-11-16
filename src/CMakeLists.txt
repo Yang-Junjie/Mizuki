@@ -2,6 +2,8 @@
 set(SOURCE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/build/builder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/build/output_transaction.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/build/paths.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cli/commands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/dev/live_reload.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/dev/server.cpp

@@ -1,4 +1,6 @@
 #include "build/builder.hpp"
+#include "build/output_transaction.hpp"
+#include "build/paths.hpp"
 #include "parse/markdown.hpp"
 #include "render/renderer.hpp"
 #include "util/file.hpp"
@@ -18,7 +20,7 @@ Builder::Builder(BuildOptions options) : options_(std::move(options)) {}
 BuildResult Builder::build() const {
     BuildResult result;
     try {
-        fs::create_directories(options_.output_dir);
+        OutputTransaction output(validate_output_path(options_));
         Renderer renderer(options_.theme_dir / "layouts/post.html");
 
         // Render Markdown pages and copy other content files.
@@ -28,7 +30,7 @@ BuildResult Builder::build() const {
             }
 
             auto const relative = file.path().lexically_relative(options_.content_dir);
-            auto destination = options_.output_dir / relative;
+            auto destination = output.stage() / relative;
             fs::create_directories(destination.parent_path());
 
             if (is_markdown(file.path())) {
@@ -69,12 +71,13 @@ BuildResult Builder::build() const {
                 }
 
                 auto const relative = file.path().lexically_relative(theme_assets);
-                auto const destination = options_.output_dir / "assets" / relative;
+                auto const destination = output.stage() / "assets" / relative;
                 fs::create_directories(destination.parent_path());
                 fs::copy_file(file.path(), destination, fs::copy_options::overwrite_existing);
                 ++result.assets_copied;
             }
         }
+        output.commit();
         result.success = true;
     } catch (std::exception const& error) {
         result.error = error.what();
