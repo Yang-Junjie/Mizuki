@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -18,4 +19,12 @@ struct SiteMetadata {
     std::vector<NavigationItem> navigation{{"首页", "/"}};
 };
 
-}  // namespace mizuki
+struct SiteConfig {
+    std::filesystem::path content_dir{"content"};
+    std::filesystem::path theme_dir{"themes/default"};
+    std::filesystem::path output_dir{"dist"};
+    std::filesystem::path config_file;
+    SiteMetadata site;
+};
+
+} // namespace mizuki

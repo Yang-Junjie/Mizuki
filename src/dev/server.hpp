@@ -5,4 +5,4 @@ namespace mizuki {
 
 int serve(ConfigRequest const& request, int port = 3939);
 
-}  // namespace mizuki
+} // namespace mizuki

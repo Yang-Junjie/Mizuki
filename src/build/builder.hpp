@@ -3,34 +3,15 @@
 #include "config/site.hpp"
 
 #include <cstddef>
-#include <filesystem>
-#include <string>
 
 namespace mizuki {
 
-struct BuildOptions {
-    std::filesystem::path content_dir{"content"};
-    std::filesystem::path theme_dir{"themes/default"};
-    std::filesystem::path output_dir{"dist"};
-    std::filesystem::path config_file;
-    SiteMetadata site;
-};
-
-struct BuildResult {
-    bool success{false};
+struct BuildStats {
     std::size_t pages_built{0};
     std::size_t assets_copied{0};
-    std::string error;
 };
 
-class Builder {
-public:
-    explicit Builder(BuildOptions options = {});
+// Returns only after the complete site has been published; failures throw.
+BuildStats build_site(SiteConfig const& config);
 
-    BuildResult build() const;
-
-private:
-    BuildOptions options_;
-};
-
-}  // namespace mizuki
+} // namespace mizuki

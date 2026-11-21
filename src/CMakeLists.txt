@@ -1,32 +1,39 @@
-
-set(SOURCE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/build/article_list.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/build/builder.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/build/output_transaction.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/build/paths.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/build/plan.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/build/links.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/cli/commands.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/config/config.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/dev/live_reload.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/dev/server.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/dev/watch.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/parse/front_matter.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/parse/markdown.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/render/renderer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/util/file.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/util/html.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/util/path.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/util/url.cpp
+# Build logic is reusable without bringing in HTTP or file watching.
+add_library(mizuki_core STATIC
+    build/builder.cpp
+    build/links.cpp
+    build/output_transaction.cpp
+    build/paths.cpp
+    build/plan.cpp
+    config/config.cpp
+    parse/front_matter.cpp
+    parse/markdown.cpp
+    render/article_list.cpp
+    render/html_links.cpp
+    render/navigation.cpp
+    render/template.cpp
+    util/file.cpp
+    util/html.cpp
+    util/path.cpp
+    util/url.cpp
 )
+target_include_directories(mizuki_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(mizuki_core PRIVATE
+    spdlog::spdlog md4c md4c-html tomlplusplus::tomlplusplus)
 
-add_executable(mizuki ${SOURCE_FILES})
+add_library(mizuki_dev STATIC
+    dev/file_watcher.cpp
+    dev/live_reload.cpp
+    dev/preview.cpp
+    dev/server.cpp
+    dev/watch.cpp
+)
+target_link_libraries(mizuki_dev PUBLIC mizuki_core PRIVATE
+    spdlog::spdlog efsw httplib::httplib)
 
-target_include_directories(mizuki PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_executable(mizuki main.cpp cli/commands.cpp)
+target_link_libraries(mizuki PRIVATE mizuki_dev spdlog::spdlog)
 
-target_link_libraries(mizuki PRIVATE spdlog::spdlog md4c md4c-html efsw httplib::httplib tomlplusplus::tomlplusplus)
-
-if(MSVC)
-    target_compile_options(mizuki PRIVATE /utf-8)
-endif()
+foreach(target mizuki_core mizuki_dev mizuki)
+    mizuki_configure_target(${target})
+endforeach()

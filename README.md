@@ -163,3 +163,5 @@ ctest --test-dir build --output-on-failure
 ```
 
 测试均使用临时目录，包括构建与输出事务、冲突诊断和旧输出保护、Markdown 链接、TOML 校验及优先级、独立页面和导航，以及真实 `watch` / `serve` 进程的文件变化、配置热重载、监听目录切换、HTTP 和 SSE。测试进程退出时会清理临时文件及子进程。
+
+代码分层、接口约定、格式化和单独运行测试的方法见 [开发约定](CONTRIBUTING.md)。

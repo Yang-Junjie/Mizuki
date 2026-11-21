@@ -6,12 +6,13 @@ FetchContent_Declare(
     GIT_TAG        v1.17.0
     GIT_SHALLOW    TRUE
     GIT_PROGRESS   TRUE
-    FIND_PACKAGE_ARGS   
+    FIND_PACKAGE_ARGS
 )
 
-set(SPDLOG_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-set(SPDLOG_FMT_EXTERNAL OFF CACHE BOOL "" FORCE)   
-set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE) 
-set(SPDLOG_BUILD_TESTS  OFF CACHE BOOL "" FORCE) 
-
-FetchContent_MakeAvailable(spdlog)
+block()
+    set(SPDLOG_BUILD_SHARED OFF)
+    set(SPDLOG_FMT_EXTERNAL OFF)
+    set(SPDLOG_BUILD_EXAMPLE OFF)
+    set(SPDLOG_BUILD_TESTS OFF)
+    FetchContent_MakeAvailable(spdlog)
+endblock()

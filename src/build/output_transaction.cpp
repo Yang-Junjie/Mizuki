@@ -1,5 +1,7 @@
 #include "build/output_transaction.hpp"
 
+#include "util/path.hpp"
+
 #include <spdlog/spdlog.h>
 
 #include <atomic>
@@ -33,7 +35,7 @@ fs::path create_unique_sibling(fs::path const& output, std::string_view kind) {
         }
     }
     throw std::runtime_error("Failed to reserve a unique build directory beside " +
-                             output.string());
+                             path_to_utf8(output));
 }
 
 void cleanup_directory(fs::path const& path) {
@@ -43,21 +45,25 @@ void cleanup_directory(fs::path const& path) {
     std::error_code error;
     fs::remove_all(path, error);
     if (error) {
-        spdlog::warn("Failed to remove build directory {}; remove it manually: {}", path.string(),
-                     error.message());
+        spdlog::warn("Failed to remove build directory {}; remove it manually: {}",
+                     path_to_utf8(path), error.message());
     }
 }
 
-}  // namespace
+} // namespace
 
 OutputTransaction::OutputTransaction(fs::path output) : output_(std::move(output)) {
     fs::create_directories(output_.parent_path());
     stage_ = create_unique_sibling(output_, "stage");
 }
 
-OutputTransaction::~OutputTransaction() { cleanup_directory(stage_); }
+OutputTransaction::~OutputTransaction() {
+    cleanup_directory(stage_);
+}
 
-fs::path const& OutputTransaction::stage() const { return stage_; }
+fs::path const& OutputTransaction::stage() const {
+    return stage_;
+}
 
 void OutputTransaction::commit() {
     fs::path backup;
@@ -86,11 +92,11 @@ void OutputTransaction::commit() {
                 cleanup_directory(backup);
             }
         }
-        auto message = "Failed to publish output directory " + output_.string() + ": " +
+        auto message = "Failed to publish output directory " + path_to_utf8(output_) + ": " +
                        publish_error.message();
         if (restore_error) {
             message += ". Failed to restore previous output: " + restore_error.message() +
-                       ". Previous site preserved at: " + saved_site.string();
+                       ". Previous site preserved at: " + path_to_utf8(saved_site);
         }
         throw std::runtime_error(message);
     }
@@ -99,4 +105,4 @@ void OutputTransaction::commit() {
     cleanup_directory(backup);
 }
 
-}  // namespace mizuki
+} // namespace mizuki

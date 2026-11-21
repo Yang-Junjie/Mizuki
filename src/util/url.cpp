@@ -5,22 +5,12 @@
 
 namespace mizuki {
 
-std::string url_path(std::filesystem::path const& path) {
-    auto const utf8 = path.generic_u8string();
-    return {reinterpret_cast<char const*>(utf8.data()), utf8.size()};
-}
-
-std::filesystem::path path_from_url(std::string_view path) {
-    return std::filesystem::path(std::u8string_view(
-        reinterpret_cast<char8_t const*>(path.data()), path.size()));
-}
-
 std::string encode_url_path(std::string_view path) {
     constexpr char hex[] = "0123456789ABCDEF";
     std::string result;
     for (unsigned char ch : path) {
-        if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-            (ch >= '0' && ch <= '9') || ch == '-' || ch == '.' || ch == '_' || ch == '~' || ch == '/') {
+        if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') ||
+            ch == '-' || ch == '.' || ch == '_' || ch == '~' || ch == '/') {
             result += static_cast<char>(ch);
         } else {
             result += '%';
@@ -33,9 +23,15 @@ std::string encode_url_path(std::string_view path) {
 
 std::string decode_url_path(std::string_view path) {
     auto hex = [](unsigned char ch) -> int {
-        if (ch >= '0' && ch <= '9') return ch - '0';
-        if (ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
-        if (ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
+        if (ch >= '0' && ch <= '9') {
+            return ch - '0';
+        }
+        if (ch >= 'a' && ch <= 'f') {
+            return ch - 'a' + 10;
+        }
+        if (ch >= 'A' && ch <= 'F') {
+            return ch - 'A' + 10;
+        }
         return -1;
     };
     std::string result;
@@ -58,9 +54,13 @@ std::string decode_url_path(std::string_view path) {
 }
 
 bool has_url_scheme(std::string_view url) {
-    if (url.empty() || !std::isalpha(static_cast<unsigned char>(url.front()))) return false;
+    if (url.empty() || !std::isalpha(static_cast<unsigned char>(url.front()))) {
+        return false;
+    }
     for (char ch : url) {
-        if (ch == ':') return true;
+        if (ch == ':') {
+            return true;
+        }
         if (!std::isalnum(static_cast<unsigned char>(ch)) && ch != '+' && ch != '-' && ch != '.') {
             return false;
         }
@@ -68,4 +68,4 @@ bool has_url_scheme(std::string_view url) {
     return false;
 }
 
-}  // namespace mizuki
+} // namespace mizuki

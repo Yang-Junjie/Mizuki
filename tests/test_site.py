@@ -2,10 +2,9 @@
 
 from html.parser import HTMLParser
 import subprocess
-import unittest
 from urllib.parse import quote
 
-from test_builder import BINARY, BuilderFixture
+from support import BuilderFixture, run_tests
 
 
 class Anchors(HTMLParser):
@@ -22,7 +21,7 @@ class Anchors(HTMLParser):
 class SiteTests(BuilderFixture):
     def command(self, *args, success=True, cwd=None):
         result = subprocess.run(
-            [str(BINARY), "build", *map(str, args)],
+            [str(self.binary), "build", *map(str, args)],
             cwd=cwd or self.root, capture_output=True, text=True, encoding="utf-8", timeout=15,
         )
         message = result.stdout + result.stderr
@@ -336,4 +335,4 @@ url = "https://example.com/path?q=1&x=2"
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    run_tests()

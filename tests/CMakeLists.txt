@@ -12,13 +12,16 @@ add_test(NAME mizuki.dev
             "$<TARGET_FILE:mizuki>")
 
 add_executable(mizuki_output_transaction_tests
-    output_transaction_test.cpp
-    "${PROJECT_SOURCE_DIR}/src/build/output_transaction.cpp"
-    "${PROJECT_SOURCE_DIR}/src/util/file.cpp")
-target_include_directories(mizuki_output_transaction_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
-target_link_libraries(mizuki_output_transaction_tests PRIVATE spdlog::spdlog)
+    output_transaction_test.cpp)
+target_link_libraries(mizuki_output_transaction_tests PRIVATE mizuki_core)
+mizuki_configure_target(mizuki_output_transaction_tests)
 add_test(NAME mizuki.output_transaction COMMAND mizuki_output_transaction_tests)
 
-set_tests_properties(mizuki.builder mizuki.site mizuki.output_transaction PROPERTIES TIMEOUT 60)
+add_executable(mizuki_core_tests core_test.cpp)
+target_link_libraries(mizuki_core_tests PRIVATE mizuki_core)
+mizuki_configure_target(mizuki_core_tests)
+add_test(NAME mizuki.core COMMAND mizuki_core_tests)
+
+set_tests_properties(mizuki.builder mizuki.site mizuki.output_transaction mizuki.core PROPERTIES TIMEOUT 60)
 set_tests_properties(mizuki.dev PROPERTIES TIMEOUT 120)
 set_tests_properties(mizuki.builder mizuki.site mizuki.dev PROPERTIES ENVIRONMENT "PYTHONUTF8=1")

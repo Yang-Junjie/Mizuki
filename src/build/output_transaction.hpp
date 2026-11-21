@@ -21,4 +21,4 @@ private:
     std::filesystem::path stage_;
 };
 
-}  // namespace mizuki
+} // namespace mizuki

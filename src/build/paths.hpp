@@ -4,9 +4,9 @@
 
 namespace mizuki {
 
-struct BuildOptions;
+struct SiteConfig;
 
 // Validate before creating any build directories; return the resolved output path.
-std::filesystem::path validate_output_path(BuildOptions const& options);
+std::filesystem::path validate_output_path(SiteConfig const& options);
 
-}  // namespace mizuki
+} // namespace mizuki

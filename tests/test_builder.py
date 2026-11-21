@@ -3,71 +3,9 @@
 from pathlib import Path
 import os
 import shutil
-import subprocess
-import sys
-import tempfile
 import unittest
 
-
-BINARY = Path(sys.argv.pop(1)).resolve()
-DEFAULT_THEME = Path(__file__).resolve().parents[1] / "themes" / "default"
-
-
-class BuilderFixture(unittest.TestCase):
-    def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="mizuki-builder-")
-        self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
-        self.content = self.root / "content"
-        self.theme = self.root / "theme"
-        self.output = self.root / "dist"
-        self.content.mkdir()
-        shutil.copytree(DEFAULT_THEME, self.theme)
-        self.write_page("index.md", "Home", "Welcome.")
-        self.write_page("posts/first.md", "First post", "Original body.")
-
-    def write_page(self, name, title, body, draft=False, date="2026-11-16"):
-        path = self.content / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            f"---\ntitle: {title}\ndate: {date}\n"
-            f"draft: {'true' if draft else 'false'}\n---\n\n{body}\n",
-            encoding="utf-8",
-        )
-
-    def build(self, *, success=True, output=None, cwd=None):
-        result = subprocess.run(
-            [
-                str(BINARY), "build",
-                "--content", str(self.content),
-                "--theme", str(self.theme),
-                "--output", str(self.output if output is None else output),
-            ],
-            cwd=self.root if cwd is None else cwd,
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        self.assertEqual(result.returncode, 0 if success else 1, result.stdout + result.stderr)
-        return result.stdout + result.stderr
-
-    def snapshot(self, directory=None):
-        directory = self.output if directory is None else directory
-        return {
-            path.relative_to(directory).as_posix(): path.read_bytes()
-            for path in directory.rglob("*")
-            if path.is_file()
-        }
-
-    def assert_no_temporary_directories(self, output=None):
-        output = self.output if output is None else Path(output)
-        self.assertEqual(list(output.parent.glob(output.name + ".mizuki-*")), [])
-
-    def make_symlink(self, link, target):
-        try:
-            link.symlink_to(target, target_is_directory=True)
-        except (OSError, NotImplementedError) as error:
-            self.skipTest(f"Directory symlinks unavailable: {error}")
+from support import BuilderFixture, run_tests
 
 
 class BuilderTests(BuilderFixture):
@@ -224,7 +162,11 @@ class BuilderTests(BuilderFixture):
                     layout.unlink()
                 else:
                     layout.write_text(invalid)
-                self.build(success=False)
+                error = self.build(success=False)
+                self.assertIn(layout.as_posix(), error)
+                self.assertIn("Failed to load template" if invalid is None else "Missing required placeholder", error)
+                if invalid is not None:
+                    self.assertIn("{markdown}", error)
                 self.assertEqual(self.snapshot(), before)
                 self.assert_no_temporary_directories()
 
@@ -238,7 +180,11 @@ class BuilderTests(BuilderFixture):
                     layout.unlink()
                 else:
                     layout.write_text(invalid, encoding="utf-8")
-                self.build(success=False)
+                error = self.build(success=False)
+                self.assertIn(layout.as_posix(), error)
+                self.assertIn("Failed to load template" if invalid is None else "Missing required placeholder", error)
+                if invalid is not None:
+                    self.assertIn("{asset_base}", error)
                 self.assertEqual(self.snapshot(), before)
                 self.assert_no_temporary_directories()
 
@@ -387,4 +333,4 @@ class BuilderTests(BuilderFixture):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    run_tests()

@@ -1,8 +1,11 @@
 #pragma once
+
 #include <string>
 #include <string_view>
 
 namespace mizuki {
+
+enum class DocumentKind { Article, Page };
 
 struct FrontMatter {
     std::string title;
@@ -10,7 +13,12 @@ struct FrontMatter {
     bool draft{false};
 };
 
-bool parse_front_matter(std::string_view source, FrontMatter& metadata, std::string_view& body,
-                        std::string& error, bool require_date = true);
+struct Document {
+    FrontMatter metadata;
+    std::string body;
+};
 
-}  // namespace mizuki
+// Owns the body, so the result does not borrow from the input text.
+Document parse_document(std::string_view source, DocumentKind kind);
+
+} // namespace mizuki

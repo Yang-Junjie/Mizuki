@@ -1,12 +1,15 @@
 #include "cli/commands.hpp"
+
 #include "build/builder.hpp"
 #include "config/config.hpp"
 #include "dev/server.hpp"
 #include "dev/watch.hpp"
+#include "util/path.hpp"
 
 #include <spdlog/spdlog.h>
 
 #include <charconv>
+#include <exception>
 #include <iostream>
 #include <optional>
 #include <string_view>
@@ -56,8 +59,7 @@ std::optional<Command> parse_command(std::string_view name) {
 
 bool parse_port(std::string_view value, int& port) {
     auto const [end, error] = std::from_chars(value.data(), value.data() + value.size(), port);
-    return error == std::errc{} && end == value.data() + value.size() && port >= 1 &&
-           port <= 65535;
+    return error == std::errc{} && end == value.data() + value.size() && port >= 1 && port <= 65535;
 }
 
 ParseResult parse_args(int argc, char** argv, CliOptions& cli) {
@@ -120,19 +122,14 @@ ParseResult parse_args(int argc, char** argv, CliOptions& cli) {
     return ParseResult::Ok;
 }
 
-int run_build(BuildOptions const& options) {
-    Builder builder(options);
-    auto const result = builder.build();
-    if (!result.success) {
-        spdlog::error("Build failed: {}", result.error);
-        return 1;
-    }
+int run_build(SiteConfig const& options) {
+    auto const result = build_site(options);
     spdlog::info("Built {} page(s), copied {} asset(s) -> {}", result.pages_built,
-                 result.assets_copied, options.output_dir.string());
+                 result.assets_copied, path_to_utf8(options.output_dir));
     return 0;
 }
 
-}  // namespace
+} // namespace
 
 int run_cli(int argc, char** argv) {
     CliOptions cli;
@@ -146,18 +143,18 @@ int run_cli(int argc, char** argv) {
 
     try {
         switch (cli.command) {
-            case Command::Serve:
-                return serve(cli.config, cli.port);
-            case Command::Watch:
-                return watch(cli.config);
-            case Command::Build:
-                return run_build(load_config(cli.config));
+        case Command::Serve:
+            return serve(cli.config, cli.port);
+        case Command::Watch:
+            return watch(cli.config);
+        case Command::Build:
+            return run_build(load_config(cli.config));
         }
     } catch (std::exception const& error) {
-        spdlog::error("{}", error.what());
+        spdlog::error("Build failed: {}", error.what());
         return 1;
     }
     return 1;
 }
 
-}  // namespace mizuki
+} // namespace mizuki

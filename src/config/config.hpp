@@ -1,6 +1,6 @@
 #pragma once
 
-#include "build/builder.hpp"
+#include "config/site.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -16,6 +16,6 @@ struct ConfigRequest {
     std::optional<std::filesystem::path> output_dir;
 };
 
-BuildOptions load_config(ConfigRequest const& request);
+SiteConfig load_config(ConfigRequest const& request);
 
-}  // namespace mizuki
+} // namespace mizuki

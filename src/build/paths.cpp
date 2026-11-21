@@ -1,5 +1,7 @@
 #include "build/paths.hpp"
-#include "build/builder.hpp"
+
+#include "config/site.hpp"
+#include "util/path.hpp"
 
 #include <stdexcept>
 #include <system_error>
@@ -27,9 +29,9 @@ bool is_within(fs::path path, fs::path const& directory) {
     }
 }
 
-}  // namespace
+} // namespace
 
-fs::path validate_output_path(BuildOptions const& options) {
+fs::path validate_output_path(SiteConfig const& options) {
     if (options.output_dir.empty()) {
         throw std::runtime_error("Output directory must not be empty");
     }
@@ -43,10 +45,10 @@ fs::path validate_output_path(BuildOptions const& options) {
     auto const status = fs::symlink_status(requested);
     if (fs::is_symlink(status)) {
         throw std::runtime_error("Output directory must not be a symbolic link: " +
-                                 requested.string());
+                                 path_to_utf8(requested));
     }
     if (fs::exists(status) && !fs::is_directory(status)) {
-        throw std::runtime_error("Output path must be a directory: " + requested.string());
+        throw std::runtime_error("Output path must be a directory: " + path_to_utf8(requested));
     }
 
     auto output = fs::weakly_canonical(requested);
@@ -57,25 +59,25 @@ fs::path validate_output_path(BuildOptions const& options) {
     if (output == output.root_path() || is_within(fs::canonical(fs::current_path()), output)) {
         throw std::runtime_error("Output directory must not be a filesystem root, the working "
                                  "directory or one of its ancestors: " +
-                                 output.string());
+                                 path_to_utf8(output));
     }
     if (!options.config_file.empty() &&
         is_within(fs::weakly_canonical(options.config_file), output)) {
         throw std::runtime_error("Output directory must not contain the configuration file: " +
-                                 options.config_file.string());
+                                 path_to_utf8(options.config_file));
     }
     for (auto const& source : {options.content_dir, options.theme_dir}) {
         if (!fs::is_directory(source)) {
             throw std::runtime_error("Source directory does not exist or is not a directory: " +
-                                     source.string());
+                                     path_to_utf8(source));
         }
         auto const canonical_source = fs::canonical(source);
         if (is_within(output, canonical_source) || is_within(canonical_source, output)) {
             throw std::runtime_error("Output directory must not overlap source directory: " +
-                                     canonical_source.string());
+                                     path_to_utf8(canonical_source));
         }
     }
     return output;
 }
 
-}  // namespace mizuki
+} // namespace mizuki

@@ -1,49 +1,20 @@
 #include "build/output_transaction.hpp"
+#include "support.hpp"
 #include "util/file.hpp"
 
-#include <chrono>
 #include <exception>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <system_error>
 
 namespace fs = std::filesystem;
 
 namespace {
 
-void require(bool condition, std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
-
-class TemporaryDirectory {
-public:
-    TemporaryDirectory() {
-        for (int attempt = 0; attempt < 100; ++attempt) {
-            path_ = fs::temp_directory_path() /
-                    ("mizuki-output-test-" +
-                     std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-            if (fs::create_directory(path_)) {
-                return;
-            }
-        }
-        throw std::runtime_error("Could not reserve a temporary test directory");
-    }
-
-    ~TemporaryDirectory() {
-        std::error_code error;
-        fs::remove_all(path_, error);
-    }
-
-    fs::path const& path() const { return path_; }
-
-private:
-    fs::path path_;
-};
+using mizuki::test::require;
+using mizuki::test::TemporaryDirectory;
 
 void assert_no_temporary_directories(fs::path const& parent) {
     for (auto const& entry : fs::directory_iterator(parent)) {
@@ -106,7 +77,7 @@ void failed_publish_restores_previous_site() {
     assert_no_temporary_directories(temporary.path());
 }
 
-}  // namespace
+} // namespace
 
 int main() {
     try {

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "build/builder.hpp"
-#include "parse/markdown.hpp"
+#include "config/site.hpp"
+#include "parse/front_matter.hpp"
 
 #include <filesystem>
 #include <map>
-#include <string>
+#include <set>
 #include <vector>
 
 namespace mizuki {
@@ -14,8 +14,8 @@ struct PlannedPage {
     std::filesystem::path source;
     std::filesystem::path relative;
     std::filesystem::path output;
-    Markdown markdown;
-    bool independent;
+    Document document;
+    DocumentKind kind;
 };
 
 struct PlannedAsset {
@@ -27,9 +27,9 @@ struct BuildPlan {
     std::vector<PlannedPage> pages;
     std::vector<PlannedAsset> assets;
     std::map<std::filesystem::path, std::filesystem::path> page_urls;
-    std::map<std::filesystem::path, std::string> outputs;
+    std::set<std::filesystem::path> outputs;
 };
 
-BuildPlan plan_build(BuildOptions const& options);
+BuildPlan plan_build(SiteConfig const& options);
 
-}  // namespace mizuki
+} // namespace mizuki

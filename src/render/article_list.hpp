@@ -13,4 +13,4 @@ struct ArticleSummary {
 
 std::string render_article_list(std::vector<ArticleSummary> articles);
 
-}  // namespace mizuki
+} // namespace mizuki

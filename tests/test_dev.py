@@ -7,9 +7,8 @@ import shutil
 import socket
 import subprocess
 import time
-import unittest
 
-from test_builder import BINARY, BuilderFixture
+from support import BuilderFixture, run_tests
 
 
 class DevTests(BuilderFixture):
@@ -34,7 +33,7 @@ class DevTests(BuilderFixture):
         self.log_path = self.root / "process.log"
         log = self.log_path.open("wb")
         self.addCleanup(log.close)
-        command_args = [str(BINARY), command, *map(str, args)]
+        command_args = [str(self.binary), command, *map(str, args)]
         if command == "serve":
             command_args.extend(["--port", str(self.port)])
         self.process = subprocess.Popen(command_args, cwd=self.root, stdout=log, stderr=subprocess.STDOUT)
@@ -228,22 +227,48 @@ class DevTests(BuilderFixture):
         self.assertIn("Initial site", (self.output / "index.html").read_text(encoding="utf-8"))
         self.assert_no_temporary_directories(next_output)
 
+    def test_initial_failed_build_serves_previous_output_and_recovers(self):
+        self.build()
+        before = self.snapshot()
+        (self.content / "posts/first.md").write_text("Broken source.", encoding="utf-8")
+        self.start()
+        self.wait_for(lambda: "Build failed" in self.logs(), "initial failed build")
+        self.assertEqual(self.snapshot(), before)
+        self.assertTrue(self.http_contains("/posts/first.html", "Original body."))
+        initial_version = self.version()
+        self.write_page("posts/first.md", "Repaired", "Recovered after startup failure.")
+        self.wait_for(lambda: self.http_contains("/posts/first.html", "Recovered after startup failure."),
+                      "recovery after initial failure")
+        self.assertGreater(self.version(), initial_version)
+        self.assert_no_temporary_directories()
+
+    def test_initial_failed_build_without_output_exits(self):
+        self.configure()
+        (self.content / "posts/first.md").write_text("Broken source.", encoding="utf-8")
+        result = subprocess.run([str(self.binary), "serve"], cwd=self.root,
+                                capture_output=True, text=True, encoding="utf-8", timeout=15)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Failed to parse", result.stdout + result.stderr)
+        self.assertIn("Failed to serve directory", result.stdout + result.stderr)
+        self.assertFalse(self.output.exists())
+        self.assert_no_temporary_directories()
+
     def test_occupied_port_fails_and_cli_rejects_invalid_ports(self):
         self.configure()
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             listener.listen()
             port = listener.getsockname()[1]
-            result = subprocess.run([str(BINARY), "serve", "--port", str(port)], cwd=self.root,
+            result = subprocess.run([str(self.binary), "serve", "--port", str(port)], cwd=self.root,
                                     capture_output=True, text=True, encoding="utf-8", timeout=15)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("Failed to bind", result.stdout + result.stderr)
         for port in ("0", "65536", "-1", "12x"):
-            result = subprocess.run([str(BINARY), "serve", "--port", port], cwd=self.root,
+            result = subprocess.run([str(self.binary), "serve", "--port", port], cwd=self.root,
                                     capture_output=True, text=True, encoding="utf-8", timeout=15)
             self.assertEqual(result.returncode, 1)
             self.assertIn("Invalid port", result.stdout + result.stderr)
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    run_tests()

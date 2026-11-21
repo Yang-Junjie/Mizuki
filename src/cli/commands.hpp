@@ -4,4 +4,4 @@ namespace mizuki {
 
 int run_cli(int argc, char** argv);
 
-}  // namespace mizuki
+} // namespace mizuki

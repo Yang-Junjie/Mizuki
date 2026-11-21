@@ -1,4 +1,4 @@
-#include "build/article_list.hpp"
+#include "render/article_list.hpp"
 
 #include "util/html.hpp"
 #include "util/url.hpp"
@@ -28,4 +28,4 @@ std::string render_article_list(std::vector<ArticleSummary> articles) {
     return html;
 }
 
-}  // namespace mizuki
+} // namespace mizuki

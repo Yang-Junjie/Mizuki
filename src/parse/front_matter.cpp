@@ -2,13 +2,13 @@
 
 #include <algorithm>
 #include <cctype>
+#include <stdexcept>
 #include <utility>
 
 namespace mizuki {
 
 namespace {
 
-// 去除字符串首尾空白字符
 std::string_view trim(std::string_view text) {
     auto const is_space = [](char ch) { return std::isspace(static_cast<unsigned char>(ch)) != 0; };
     while (!text.empty() && is_space(text.front())) {
@@ -22,8 +22,10 @@ std::string_view trim(std::string_view text) {
 
 std::string_view next_line(std::string_view& remaining) {
     auto const newline = remaining.find('\n');
-    std::string_view const line = newline == std::string_view::npos ? remaining : remaining.substr(0, newline);
-    remaining = newline == std::string_view::npos ? std::string_view{} : remaining.substr(newline + 1);
+    std::string_view const line =
+        newline == std::string_view::npos ? remaining : remaining.substr(0, newline);
+    remaining =
+        newline == std::string_view::npos ? std::string_view{} : remaining.substr(newline + 1);
     return line;
 }
 
@@ -43,12 +45,10 @@ bool equals_ignore_case(std::string_view lhs, std::string_view rhs) {
     });
 }
 
-}  // namespace
+} // namespace
 
-bool parse_front_matter(std::string_view source, FrontMatter& metadata, std::string_view& body,
-                        std::string& error, bool require_date) {
-    metadata = {};
-    error.clear();
+Document parse_document(std::string_view source, DocumentKind kind) {
+    FrontMatter metadata;
 
     constexpr std::string_view bom = "\xEF\xBB\xBF";
     if (source.starts_with(bom)) {
@@ -57,8 +57,7 @@ bool parse_front_matter(std::string_view source, FrontMatter& metadata, std::str
 
     auto remaining = source;
     if (trim(next_line(remaining)) != "---") {
-        error = "Missing front matter";
-        return false;
+        throw std::runtime_error("Missing front matter");
     }
 
     bool has_title = false;
@@ -88,58 +87,48 @@ bool parse_front_matter(std::string_view source, FrontMatter& metadata, std::str
         auto const key = trim(line.substr(0, colon));
         auto const value = unquote(trim(line.substr(colon + 1)));
         if (key.empty()) {
-            error = "Invalid front matter line: " + std::string(line);
-            return false;
+            throw std::runtime_error("Invalid front matter line: " + std::string(line));
         }
 
         if (key == "title") {
             if (has_title) {
-                error = "Duplicate front matter key: title";
-                return false;
+                throw std::runtime_error("Duplicate front matter key: title");
             }
             has_title = true;
             metadata.title = value;
         } else if (key == "date") {
             if (has_date) {
-                error = "Duplicate front matter key: date";
-                return false;
+                throw std::runtime_error("Duplicate front matter key: date");
             }
             has_date = true;
             metadata.date = value;
         } else if (key == "draft") {
             if (has_draft) {
-                error = "Duplicate front matter key: draft";
-                return false;
+                throw std::runtime_error("Duplicate front matter key: draft");
             }
             has_draft = true;
             if (equals_ignore_case(value, "true")) {
                 metadata.draft = true;
             } else if (!equals_ignore_case(value, "false")) {
-                error = "Invalid front matter: 'draft' must be true or false";
-                return false;
+                throw std::runtime_error("Invalid front matter: 'draft' must be true or false");
             }
         }
     }
 
     if (!closed) {
-        error = "Invalid front matter: missing closing '---'";
-        return false;
+        throw std::runtime_error("Invalid front matter: missing closing '---'");
     }
     if (!line_error.empty()) {
-        error = std::move(line_error);
-        return false;
+        throw std::runtime_error(std::move(line_error));
     }
     if (!has_title || metadata.title.empty()) {
-        error = "Invalid front matter: missing required key 'title'";
-        return false;
+        throw std::runtime_error("Invalid front matter: missing required key 'title'");
     }
-    if ((require_date && !has_date) || (has_date && metadata.date.empty())) {
-        error = "Invalid front matter: missing required key 'date'";
-        return false;
+    if ((kind == DocumentKind::Article && !has_date) || (has_date && metadata.date.empty())) {
+        throw std::runtime_error("Invalid front matter: missing required key 'date'");
     }
 
-    body = remaining;
-    return true;
+    return {std::move(metadata), std::string(remaining)};
 }
 
-}  // namespace mizuki
+} // namespace mizuki

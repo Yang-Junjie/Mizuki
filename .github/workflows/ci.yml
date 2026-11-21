@@ -9,6 +9,17 @@ permissions:
   contents: read
 
 jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends clang-format-18
+      - name: Check C++ formatting
+        run: git ls-files -z -- '*.cpp' '*.hpp' | xargs -0 clang-format-18 --dry-run --Werror
+
   test:
     strategy:
       fail-fast: false

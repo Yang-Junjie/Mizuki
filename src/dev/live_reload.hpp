@@ -6,21 +6,29 @@
 #include <mutex>
 
 namespace httplib {
-class Server;
+struct Response;
 }
 
 namespace mizuki {
 
-class LiveReload {
-public:
-    void attach(httplib::Server& server, std::filesystem::path const& output_dir);
-    void notify_build(std::filesystem::path const& output_dir);
-
-private:
-    std::mutex mutex_;
-    std::condition_variable changed_;
-    std::size_t version_{0};
-    std::filesystem::path output_dir_;
+struct PreviewSnapshot {
+    std::filesystem::path output_dir;
+    std::size_t version;
 };
 
-}  // namespace mizuki
+class LiveReload {
+public:
+    explicit LiveReload(std::filesystem::path const& output_dir);
+
+    PreviewSnapshot snapshot() const;
+    void notify_build(std::filesystem::path const& output_dir);
+    void stream_events(httplib::Response& response);
+
+private:
+    mutable std::mutex mutex_;
+    std::condition_variable changed_;
+    std::filesystem::path output_dir_;
+    std::size_t version_{0};
+};
+
+} // namespace mizuki

@@ -1,0 +1,10 @@
+# Apply project policy only to our targets, never to fetched dependencies.
+function(mizuki_configure_target target)
+    target_compile_features(${target} PUBLIC cxx_std_23)
+    set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /utf-8 /W4)
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endfunction()
