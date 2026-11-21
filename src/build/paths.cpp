@@ -59,6 +59,11 @@ fs::path validate_output_path(BuildOptions const& options) {
                                  "directory or one of its ancestors: " +
                                  output.string());
     }
+    if (!options.config_file.empty() &&
+        is_within(fs::weakly_canonical(options.config_file), output)) {
+        throw std::runtime_error("Output directory must not contain the configuration file: " +
+                                 options.config_file.string());
+    }
     for (auto const& source : {options.content_dir, options.theme_dir}) {
         if (!fs::is_directory(source)) {
             throw std::runtime_error("Source directory does not exist or is not a directory: " +

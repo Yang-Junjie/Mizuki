@@ -1,5 +1,6 @@
 #pragma once
 #include <efsw/efsw.hpp>
+#include "util/url.hpp"
 
 #include <filesystem>
 #include <functional>
@@ -13,7 +14,7 @@ public:
 
     FileWatcher(std::filesystem::path directory, Callback callback, bool recursive = true)
         : callback_(std::move(callback)) {
-        watch_id_ = watcher_.addWatch(directory.string(), this, recursive);
+        watch_id_ = watcher_.addWatch(url_path(directory), this, recursive);
         watcher_.watch();
     }
 
@@ -32,7 +33,7 @@ private:
     void handleFileAction(efsw::WatchID, std::string const& dir, std::string const& filename,
                           efsw::Action, std::string const&) override {
         if (callback_) {
-            callback_(std::filesystem::path(dir) / filename);
+            callback_(path_from_url(dir) / path_from_url(filename));
         }
     }
 

@@ -1,5 +1,6 @@
 #include "cli/commands.hpp"
 #include "build/builder.hpp"
+#include "config/config.hpp"
 #include "dev/server.hpp"
 #include "dev/watch.hpp"
 
@@ -21,7 +22,7 @@ enum class ParseResult { Ok, Help, Error };
 
 struct CliOptions {
     Command command{Command::Build};
-    BuildOptions build;
+    ConfigRequest config;
     int port{kDefaultPort};
 };
 
@@ -32,6 +33,7 @@ void print_usage() {
                  "  watch          Rebuild when content or theme files change\n"
                  "  serve          Watch and serve the site locally\n"
                  "\n"
+                 "  --config FILE  Site configuration (default: mizuki.toml, optional)\n"
                  "  --content DIR  Content directory (default: content)\n"
                  "  --theme DIR    Theme directory (default: themes/default)\n"
                  "  --output DIR   Generated site directory (default: dist)\n"
@@ -87,7 +89,8 @@ ParseResult parse_args(int argc, char** argv, CliOptions& cli) {
         }
 
         bool const is_port = accepts_port && option == "--port";
-        if (option != "--content" && option != "--theme" && option != "--output" && !is_port) {
+        if (option != "--content" && option != "--theme" && option != "--output" &&
+            option != "--config" && !is_port) {
             spdlog::error("Unknown option: {}", option);
             return ParseResult::Error;
         }
@@ -102,12 +105,15 @@ ParseResult parse_args(int argc, char** argv, CliOptions& cli) {
                 spdlog::error("Invalid port: {} (expected 1-65535)", value);
                 return ParseResult::Error;
             }
+        } else if (option == "--config") {
+            cli.config.config_file = value;
+            cli.config.explicit_config = true;
         } else if (option == "--content") {
-            cli.build.content_dir = value;
+            cli.config.content_dir = std::filesystem::path(value);
         } else if (option == "--theme") {
-            cli.build.theme_dir = value;
+            cli.config.theme_dir = std::filesystem::path(value);
         } else {
-            cli.build.output_dir = value;
+            cli.config.output_dir = std::filesystem::path(value);
         }
     }
 
@@ -138,13 +144,18 @@ int run_cli(int argc, char** argv) {
         return 1;
     }
 
-    switch (cli.command) {
-        case Command::Serve:
-            return serve(cli.build, cli.port);
-        case Command::Watch:
-            return watch(cli.build);
-        case Command::Build:
-            return run_build(cli.build);
+    try {
+        switch (cli.command) {
+            case Command::Serve:
+                return serve(cli.config, cli.port);
+            case Command::Watch:
+                return watch(cli.config);
+            case Command::Build:
+                return run_build(load_config(cli.config));
+        }
+    } catch (std::exception const& error) {
+        spdlog::error("{}", error.what());
+        return 1;
     }
     return 1;
 }

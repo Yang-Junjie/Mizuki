@@ -1,15 +1,18 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{site_language}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mizuki</title>
+  <meta name="description" content="{site_description}">
+  <meta name="author" content="{site_author}">
+  <title>{site_title}</title>
   <link rel="stylesheet" href="{asset_base}css/style.css">
 </head>
 <body>
   <header class="home-header">
-    <h1>Mizuki</h1>
-    <p>一个用 C++ 编写的轻量博客框架</p>
+    <h1>{site_title}</h1>
+    <p>{site_description}</p>
+    {navigation}
   </header>
   <main>
     <section aria-labelledby="articles-heading">

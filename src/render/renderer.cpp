@@ -19,7 +19,8 @@ bool Renderer::render(std::span<TemplateValue const> values) {
     }
 
     for (auto const& value : values) {
-        if (value.placeholder.empty() || layout.find(value.placeholder) == std::string::npos) {
+        if (value.placeholder.empty() ||
+            (value.required && layout.find(value.placeholder) == std::string::npos)) {
             page_.clear();
             return false;
         }

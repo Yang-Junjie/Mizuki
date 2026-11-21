@@ -9,9 +9,11 @@
 
 namespace mizuki {
 
-int serve(BuildOptions const& options, int port) {
+int serve(ConfigRequest const& request, int port) {
     LiveReload reload;
-    WatchSession session(options, [&reload] { reload.notify_build(); });
+    WatchSession session(request, [&reload](BuildOptions const& options) {
+        reload.notify_build(options.output_dir);
+    });
     if (!session.valid()) {
         return 1;
     }
@@ -19,11 +21,12 @@ int serve(BuildOptions const& options, int port) {
 
     httplib::Server server;
     server.set_default_headers({{"Cache-Control", "no-store"}});
-    if (!server.set_mount_point("/", options.output_dir.string())) {
-        spdlog::error("Failed to serve directory: {}", options.output_dir.string());
+    auto const output_dir = session.options().output_dir;
+    if (!std::filesystem::is_directory(output_dir)) {
+        spdlog::error("Failed to serve directory: {}", output_dir.string());
         return 1;
     }
-    reload.attach(server, options.output_dir);
+    reload.attach(server, output_dir);
     // Replace the library's default SO_REUSEPORT so another server cannot share the port.
     server.set_socket_options([](socket_t socket) {
 #ifdef _WIN32
@@ -38,7 +41,7 @@ int serve(BuildOptions const& options, int port) {
     }
 
     spdlog::info("Serving {} at http://127.0.0.1:{}. Press Ctrl+C to stop.",
-                 options.output_dir.string(), port);
+                 output_dir.string(), port);
     std::jthread rebuild([&session](std::stop_token stop) { session.run(stop); });
     if (!server.listen_after_bind()) {
         spdlog::error("HTTP server failed on 127.0.0.1:{}", port);

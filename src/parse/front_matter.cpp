@@ -46,7 +46,7 @@ bool equals_ignore_case(std::string_view lhs, std::string_view rhs) {
 }  // namespace
 
 bool parse_front_matter(std::string_view source, FrontMatter& metadata, std::string_view& body,
-                        std::string& error) {
+                        std::string& error, bool require_date) {
     metadata = {};
     error.clear();
 
@@ -133,7 +133,7 @@ bool parse_front_matter(std::string_view source, FrontMatter& metadata, std::str
         error = "Invalid front matter: missing required key 'title'";
         return false;
     }
-    if (!has_date || metadata.date.empty()) {
+    if ((require_date && !has_date) || (has_date && metadata.date.empty())) {
         error = "Invalid front matter: missing required key 'date'";
         return false;
     }

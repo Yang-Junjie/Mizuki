@@ -1,21 +1,19 @@
 #include "build/builder.hpp"
 #include "build/article_list.hpp"
+#include "build/links.hpp"
 #include "build/output_transaction.hpp"
 #include "build/paths.hpp"
-#include "parse/markdown.hpp"
+#include "build/plan.hpp"
 #include "render/renderer.hpp"
 #include "util/file.hpp"
-#include "util/path.hpp"
+#include "util/url.hpp"
 
-#include <spdlog/spdlog.h>
-
-#include <array>
 #include <exception>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
 namespace mizuki {
-
 namespace fs = std::filesystem;
 
 Builder::Builder(BuildOptions options) : options_(std::move(options)) {}
@@ -23,95 +21,65 @@ Builder::Builder(BuildOptions options) : options_(std::move(options)) {}
 BuildResult Builder::build() const {
     BuildResult result;
     try {
-        OutputTransaction output(validate_output_path(options_));
+        auto const output_path = validate_output_path(options_);
+        auto plan = plan_build(options_);
+        OutputTransaction output(output_path);
         Renderer post_renderer(options_.theme_dir / "layouts/post.html");
+        Renderer page_renderer(options_.theme_dir / "layouts/page.html");
         Renderer home_renderer(options_.theme_dir / "layouts/home.html");
         std::vector<ArticleSummary> articles;
-
-        // Render Markdown pages and copy other content files.
-        for (auto const& file : fs::recursive_directory_iterator(options_.content_dir)) {
-            if (!file.is_regular_file()) {
-                continue;
+        auto add_site_values = [&](std::vector<TemplateValue>& values, std::string const& navigation) {
+            values.push_back({"{site_title}", options_.site.title, false, false});
+            values.push_back({"{site_description}", options_.site.description, false, false});
+            values.push_back({"{site_author}", options_.site.author, false, false});
+            values.push_back({"{site_language}", options_.site.language, false, false});
+            values.push_back({"{navigation}", navigation, true, false});
+        };
+        for (auto& page : plan.pages) {
+            if (!page.markdown.to_html()) {
+                throw std::runtime_error("Failed to render " + url_path(page.source) + ": " + page.markdown.error());
             }
-
-            auto const relative = file.path().lexically_relative(options_.content_dir);
-            if (relative == fs::path("index.md")) {
-                continue;
+            auto const html = rewrite_document_links(page.markdown.get_html(), page.relative, plan);
+            auto const asset_base = encode_url_path(url_path(
+                fs::path("assets").lexically_relative(page.output.parent_path()))) + "/";
+            auto const navigation = render_navigation(options_.site, page.output, plan);
+            auto const& metadata = page.markdown.front_matter();
+            std::vector<TemplateValue> values{
+                {"{markdown}", html, true},
+                {"{asset_base}", asset_base},
+                {"{title}", metadata.title},
+                {"{date}", metadata.date, false, !page.independent},
+            };
+            add_site_values(values, navigation);
+            auto& renderer = page.independent ? page_renderer : post_renderer;
+            if (!renderer.render(values)) {
+                auto const layout = page.independent ? "layouts/page.html" : "layouts/post.html";
+                throw std::runtime_error("Failed to render " + url_path(page.source) +
+                                         "; check template " + url_path(options_.theme_dir / layout));
             }
-
-            auto destination = output.stage() / relative;
+            auto const destination = output.stage() / page.output;
             fs::create_directories(destination.parent_path());
-
-            if (is_markdown(file.path())) {
-                destination.replace_extension(".html");
-                Markdown markdown(file.path());
-                if (!markdown.load()) {
-                    result.error = "Failed to render " + file.path().string() + ": " + markdown.error();
-                    return result;
-                }
-                if (markdown.front_matter().draft) {
-                    spdlog::info("Skipping draft: {}", file.path().string());
-                    continue;
-                }
-                auto const asset_base = fs::path("assets").lexically_relative(relative.parent_path());
-                std::string const asset_base_path = asset_base.generic_string() + "/";
-                if (!markdown.to_html()) {
-                    result.error = "Failed to render " + file.path().string();
-                    if (!markdown.error().empty()) {
-                        result.error += ": " + markdown.error();
-                    }
-                    return result;
-                }
-
-                std::array<TemplateValue, 4> const values{{
-                    {"{markdown}", markdown.get_html(), true},
-                    {"{asset_base}", asset_base_path},
-                    {"{title}", markdown.front_matter().title},
-                    {"{date}", markdown.front_matter().date},
-                }};
-                if (!post_renderer.render(values)) {
-                    result.error = "Failed to render " + file.path().string();
-                    return result;
-                }
-                write_file(destination, post_renderer.get_html());
-
-                auto article_url = relative;
-                article_url.replace_extension(".html");
-                articles.push_back({markdown.front_matter().title, markdown.front_matter().date,
-                                    article_url.generic_string()});
-                ++result.pages_built;
-            } else {
-                fs::copy_file(file.path(), destination, fs::copy_options::overwrite_existing);
-                ++result.assets_copied;
+            write_file(destination, renderer.get_html());
+            if (!page.independent) {
+                articles.push_back({metadata.title, metadata.date, url_path(page.output)});
             }
+            ++result.pages_built;
         }
-
         auto const article_list = render_article_list(std::move(articles));
-        std::array<TemplateValue, 2> const home_values{{
-            {"{asset_base}", "assets/"},
-            {"{posts}", article_list, true},
-        }};
+        auto const navigation = render_navigation(options_.site, "index.html", plan);
+        std::vector<TemplateValue> home_values{{"{asset_base}", "assets/"}, {"{posts}", article_list, true}};
+        add_site_values(home_values, navigation);
         if (!home_renderer.render(home_values)) {
-            result.error = "Failed to render homepage template";
-            return result;
+            throw std::runtime_error("Failed to render homepage template: " +
+                                     url_path(options_.theme_dir / "layouts/home.html"));
         }
         write_file(output.stage() / "index.html", home_renderer.get_html());
         ++result.pages_built;
-
-        // Copy the theme's static assets into output/assets.
-        auto const theme_assets = options_.theme_dir / "assets";
-        if (fs::exists(theme_assets)) {
-            for (auto const& file : fs::recursive_directory_iterator(theme_assets)) {
-                if (!file.is_regular_file()) {
-                    continue;
-                }
-
-                auto const relative = file.path().lexically_relative(theme_assets);
-                auto const destination = output.stage() / "assets" / relative;
-                fs::create_directories(destination.parent_path());
-                fs::copy_file(file.path(), destination, fs::copy_options::overwrite_existing);
-                ++result.assets_copied;
-            }
+        for (auto const& asset : plan.assets) {
+            auto const destination = output.stage() / asset.output;
+            fs::create_directories(destination.parent_path());
+            fs::copy_file(asset.source, destination);
+            ++result.assets_copied;
         }
         output.commit();
         result.success = true;

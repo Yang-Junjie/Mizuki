@@ -1,8 +1,8 @@
 #pragma once
-#include "build/builder.hpp"
+#include "config/config.hpp"
 
 namespace mizuki {
 
-int serve(BuildOptions const& options, int port = 3939);
+int serve(ConfigRequest const& request, int port = 3939);
 
 }  // namespace mizuki

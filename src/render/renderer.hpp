@@ -10,6 +10,7 @@ struct TemplateValue {
     std::string_view placeholder;
     std::string_view value;
     bool raw_html{false};
+    bool required{true};
 };
 
 class Renderer {

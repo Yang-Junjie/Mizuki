@@ -13,7 +13,7 @@ BINARY = Path(sys.argv.pop(1)).resolve()
 DEFAULT_THEME = Path(__file__).resolve().parents[1] / "themes" / "default"
 
 
-class BuilderTests(unittest.TestCase):
+class BuilderFixture(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="mizuki-builder-")
         self.addCleanup(self.temporary.cleanup)
@@ -69,6 +69,8 @@ class BuilderTests(unittest.TestCase):
         except (OSError, NotImplementedError) as error:
             self.skipTest(f"Directory symlinks unavailable: {error}")
 
+
+class BuilderTests(BuilderFixture):
     def test_initial_and_repeated_builds(self):
         self.build()
         self.assertEqual(

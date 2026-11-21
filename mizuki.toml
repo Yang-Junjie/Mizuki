@@ -1,0 +1,16 @@
+# CLI 参数优先于此文件；下面的相对路径以此文件所在目录为基准。
+title = "Mizuki"
+description = "一个用 C++ 编写的轻量博客框架"
+author = ""
+language = "zh-CN"
+content = "content"
+theme = "themes/default"
+output = "dist"
+
+[[navigation]]
+title = "首页"
+url = "/"
+
+[[navigation]]
+title = "关于"
+url = "/pages/about.md"

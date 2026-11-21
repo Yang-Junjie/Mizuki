@@ -8,7 +8,7 @@
 namespace mizuki {
 class Markdown {
 public:
-    explicit Markdown(std::filesystem::path markdown_path);
+    explicit Markdown(std::filesystem::path markdown_path, bool require_date = true);
 
     bool load();
     bool to_html();
@@ -27,5 +27,6 @@ private:
     FrontMatter front_matter_;
     std::string error_;
     bool loaded_{false};
+    bool require_date_{true};
 };
 }

@@ -6,8 +6,8 @@
 
 namespace mizuki {
 
-Markdown::Markdown(std::filesystem::path markdown_path)
-    : markdown_path_(std::move(markdown_path)) {}
+Markdown::Markdown(std::filesystem::path markdown_path, bool require_date)
+    : markdown_path_(std::move(markdown_path)), require_date_(require_date) {}
 
 bool Markdown::load() {
     loaded_ = false;
@@ -24,7 +24,7 @@ bool Markdown::load() {
     }
 
     std::string_view body;
-    if (!parse_front_matter(source, front_matter_, body, error_)) {
+    if (!parse_front_matter(source, front_matter_, body, error_, require_date_)) {
         return false;
     }
 

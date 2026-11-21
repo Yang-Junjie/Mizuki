@@ -11,6 +11,6 @@ struct FrontMatter {
 };
 
 bool parse_front_matter(std::string_view source, FrontMatter& metadata, std::string_view& body,
-                        std::string& error);
+                        std::string& error, bool require_date = true);
 
 }  // namespace mizuki

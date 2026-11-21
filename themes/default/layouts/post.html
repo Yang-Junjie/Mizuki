@@ -1,16 +1,21 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{site_language}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{title}</title>
+  <meta name="description" content="{site_description}">
+  <meta name="author" content="{site_author}">
+  <title>{title} · {site_title}</title>
   <link rel="stylesheet" href="{asset_base}css/style.css">
 </head>
 <body>
+  {navigation}
   <header>
     <h1>{title}</h1>
     <time>{date}</time>
   </header>
-  {markdown}
+  <main>
+    {markdown}
+  </main>
 </body>
 </html>
