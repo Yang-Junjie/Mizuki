@@ -1,28 +1,16 @@
-<!DOCTYPE html>
-<html lang="{site_language}">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="{description}">
-  <meta name="author" content="{site_author}">
-  <title>{title}</title>
-  {publication_head}
-  <link rel="stylesheet" href="{asset_base}css/style.css">
-</head>
-<body>
+{% extends "base.html" %}
+{% block content %}
   <header class="home-header">
-    <h1>{site_title}</h1>
-    <p>{site_description}</p>
-    {navigation}
+    <h1>{{ site.title }}</h1>
+    <p>{{ site.description }}</p>
+    {% include "partials/navigation.html" %}
   </header>
   <main>
     <section aria-labelledby="articles-heading">
       <h2 id="articles-heading">文章</h2>
       <ul class="post-list">
-{posts}      </ul>
+{% include "partials/posts.html" %}      </ul>
     </section>
-    {pagination}
+    {% include "partials/pagination.html" %}
   </main>
-  <footer>{feed_link}</footer>
-</body>
-</html>
+{% endblock %}

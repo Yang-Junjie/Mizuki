@@ -1,6 +1,7 @@
 #include "parse/front_matter.hpp"
+#include "parse/markdown.hpp"
 #include "render/publication.hpp"
-#include "render/template.hpp"
+#include "render/theme.hpp"
 #include "scaffold/files.hpp"
 #include "support.hpp"
 #include "util/file.hpp"
@@ -15,8 +16,7 @@
 
 namespace {
 
-using mizuki::Template;
-using mizuki::TemplateValue;
+using mizuki::Theme;
 using mizuki::test::require;
 using mizuki::test::TemporaryDirectory;
 
@@ -44,40 +44,53 @@ void document_owns_its_metadata_and_body() {
     require(document.body == "Owned body.\n", "Parsed body depends on source lifetime");
 }
 
+void rendered_markdown_owns_its_html_and_heading_metadata() {
+    auto rendered = [] {
+        std::string source = "## *安装* 与 `C++`\n\n### 配置\n";
+        auto result = mizuki::render_markdown(source);
+        source.assign(source.size(), 'x');
+        return result;
+    }();
+    require(rendered.headings.size() == 2, "Heading metadata omitted a heading");
+    auto const& heading = rendered.headings.front();
+    require(heading.level == 2 && heading.id == "安装-与-c" && heading.text == "安装 与 C++",
+            "Heading metadata lost its level, ID or plain text");
+    require(rendered.html.find("<em>安装</em> 与 <code>C++</code>") != std::string::npos,
+            "Adding anchors changed heading formatting");
+    auto const second = mizuki::render_markdown("## 安装\n");
+    require(second.headings.front().id == "安装", "Heading IDs leaked between documents");
+}
+
 void loaded_template_is_reusable_and_renders_independent_values() {
     TemporaryDirectory temporary;
-    auto const path = temporary.path() / "layout.html";
-    mizuki::write_file(path, "<h1>{title}</h1>{body}");
-    Template const layout(path);
+    auto const path = temporary.path() / "layouts/layout.html";
+    std::filesystem::create_directory(path.parent_path());
+    mizuki::write_file(path, "<h1>{{ title }}</h1>{{ html(body) }}");
+    Theme theme(temporary.path());
+    auto const first =
+        theme.render("layout.html", {{"title", "<First>"}, {"body", "<p>{{ title }}</p>"}});
     mizuki::write_file(path, "This edit belongs to the next build.");
-    auto const first = std::array{
-        TemplateValue::text("{title}", "<First>"),
-        TemplateValue::html("{body}", "<p>{title}</p>"),
-    };
-    require(layout.render(first) == "<h1>&lt;First&gt;</h1><p>{title}</p>",
-            "Template changed after loading or recursively replaced inserted HTML");
-    auto const second = std::array{
-        TemplateValue::text("{title}", "Second"),
-        TemplateValue::html("{body}", ""),
-    };
-    require(layout.render(second) == "<h1>Second</h1>", "Rendering retained previous values");
+    require(first == "<h1>&lt;First&gt;</h1><p>{{ title }}</p>",
+            "Template escaped HTML or recursively evaluated inserted content");
+    require(theme.render("layout.html", {{"title", "Second"}, {"body", ""}}) == "<h1>Second</h1>",
+            "Template was reloaded or retained previous values");
 }
 
 void template_failure_has_context_and_does_not_poison_later_renders() {
     TemporaryDirectory temporary;
-    auto const path = temporary.path() / "layout.html";
-    mizuki::write_file(path, "{title}");
-    Template const layout(path);
-    auto const missing = std::array{TemplateValue::html("{markdown}", "body")};
-    auto const error = expect_failure([&] { layout.render(missing); });
-    require(error.find("{markdown}") != std::string::npos, "Error omitted missing placeholder");
+    auto const path = temporary.path() / "layouts/layout.html";
+    std::filesystem::create_directory(path.parent_path());
+    mizuki::write_file(path, "{{ title }}");
+    Theme theme(temporary.path());
+    auto const error =
+        expect_failure([&] { theme.render("layout.html", nlohmann::json::object()); });
+    require(error.find("title") != std::string::npos, "Error omitted missing variable");
     require(error.find(mizuki::path_to_utf8(path)) != std::string::npos,
             "Error omitted template path");
-    auto const valid = std::array{TemplateValue::text("{title}", "Still usable")};
-    require(layout.render(valid) == "Still usable", "Failed rendering poisoned the template");
-    auto const absent = temporary.path() / "missing.html";
-    auto const load_error = expect_failure([&] { Template const missing_layout(absent); });
-    require(load_error.find(mizuki::path_to_utf8(absent)) != std::string::npos &&
+    require(theme.render("layout.html", {{"title", "Still usable"}}) == "Still usable",
+            "Failed rendering poisoned the template");
+    auto const load_error = expect_failure([&] { theme.render("missing.html", {}); });
+    require(load_error.find("missing.html") != std::string::npos &&
                 load_error.find("Failed to open file") != std::string::npos,
             "Template loading error omitted file context or underlying cause");
 }
@@ -132,6 +145,7 @@ void sitemap_enforces_single_file_limits() {
 int main() {
     try {
         document_owns_its_metadata_and_body();
+        rendered_markdown_owns_its_html_and_heading_metadata();
         loaded_template_is_reusable_and_renders_independent_values();
         template_failure_has_context_and_does_not_poison_later_renders();
         sitemap_enforces_single_file_limits();

@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 
-DEPENDENCIES = ("spdlog", "md4c", "efsw", "httplib", "tomlplusplus")
+DEPENDENCIES = ("spdlog", "md4c", "efsw", "httplib", "tomlplusplus", "json", "inja")
 
 
 def check(condition, message):
@@ -115,7 +115,7 @@ def preview(binary, site, environment):
                     process.wait(timeout=5)
 
 
-def smoke_test(binary, version, root):
+def smoke_test(binary, version, root, documentation_config):
     environment = os.environ.copy()
     environment.pop("LD_LIBRARY_PATH", None)
     environment.pop("LD_PRELOAD", None)
@@ -140,6 +140,12 @@ def smoke_test(binary, version, root):
     check(all(node.text.startswith("https://example.com/blog/")
               for node in sitemap.findall("{*}url/{*}loc")), "Incorrect sitemap deployment prefix")
     preview(binary, site, environment)
+    documentation = root / "documentation"
+    run(binary, "build", "--config", documentation_config, "--output", documentation,
+        "--base-url", "https://example.com/Mizuki/", cwd=root, env=environment)
+    for name in ["index.html", "pages/themes.html", "pages/architecture.html",
+                 "pages/getting-started.html", "pages/deployment.html", "assets/css/docs.css"]:
+        check((documentation / name).is_file(), f"Missing packaged documentation output: {name}")
 
 
 def check_binary_package(package_root):
@@ -147,7 +153,14 @@ def check_binary_package(package_root):
     expected = {f"bin/{executable}", "share/mizuki/LICENSE", "share/mizuki/README.md",
                 "share/mizuki/CHANGELOG.md", "share/mizuki/CONTRIBUTING.md",
                 "share/mizuki/RELEASING.md", "share/mizuki/licenses/fmt/LICENSE"}
-    expected.update(f"share/mizuki/licenses/{name}/LICENSE" + (".md" if name == "md4c" else "")
+    expected.update(f"share/mizuki/docs/{name}" for name in [
+        "README.md", "mizuki.toml", "content/pages/getting-started.md",
+        "content/pages/themes.md", "content/pages/architecture.md", "content/pages/deployment.md",
+        "theme/theme.toml", "theme/assets/css/docs.css", "theme/layouts/base.html",
+        "theme/layouts/home.html", "theme/layouts/page.html",
+        "theme/layouts/partials/navigation.html", "theme/layouts/partials/toc.html",
+    ])
+    expected.update(f"share/mizuki/licenses/{name}/LICENSE" + ({"md4c": ".md", "json": ".MIT"}.get(name, ""))
                     for name in DEPENDENCIES)
     actual = {path.relative_to(package_root).as_posix() for path in package_root.rglob("*")
               if path.is_file()}
@@ -205,7 +218,8 @@ def main():
                   else check_binary_package(package_root))
         working = root / "working directory"
         working.mkdir()
-        smoke_test(binary, args.version, working)
+        documentation = package_root / ("docs" if args.source else "share/mizuki/docs")
+        smoke_test(binary, args.version, working, documentation / "mizuki.toml")
     print(f"Verified package, checksum and site workflow: {archive.name}")
 
 

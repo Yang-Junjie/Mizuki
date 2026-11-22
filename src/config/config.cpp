@@ -1,5 +1,6 @@
 #include "config/config.hpp"
 
+#include "config/values.hpp"
 #include "util/file.hpp"
 #include "util/path.hpp"
 
@@ -77,7 +78,7 @@ std::vector<NavigationItem> parse_navigation(toml::node const& node) {
 void read_config_file(SiteConfig& config) {
     auto const table = toml::parse(read_file(config.config_file));
     check_keys(table, {"title", "description", "author", "language", "content", "theme", "output",
-                       "navigation", "base_url", "paginate_by", "archives"});
+                       "navigation", "base_url", "paginate_by", "archives", "extra"});
     config.base_url = parse_base_url(string_value(table, "base_url", "/"));
     if (auto const* node = table.get("paginate_by")) {
         auto const value = node->value<std::int64_t>();
@@ -94,6 +95,12 @@ void read_config_file(SiteConfig& config) {
         config.archives = *value;
     }
     auto& site = config.site;
+    if (auto const* extra = table.get("extra")) {
+        if (!extra->is_table()) {
+            throw std::runtime_error("Configuration 'extra' must be a table");
+        }
+        site.extra = template_value(*extra);
+    }
     site.title = string_value(table, "title", site.title);
     site.description = string_value(table, "description", site.description, EmptyString::Allow);
     site.author = string_value(table, "author", site.author, EmptyString::Allow);

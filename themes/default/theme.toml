@@ -1,0 +1,6 @@
+name = "Mizuki Default"
+engine = "inja"
+
+[extra]
+show_toc = true
+footer_text = ""

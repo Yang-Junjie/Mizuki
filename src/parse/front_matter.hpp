@@ -11,6 +11,7 @@ struct FrontMatter {
     std::string title;
     std::string date;
     std::string description;
+    std::string layout;
     bool draft{false};
 };
 

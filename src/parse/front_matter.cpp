@@ -66,6 +66,7 @@ Document parse_document(std::string_view source, DocumentKind kind) {
     bool has_date = false;
     bool has_draft = false;
     bool has_description = false;
+    bool has_layout = false;
     bool closed = false;
     std::string line_error;
 
@@ -111,6 +112,15 @@ Document parse_document(std::string_view source, DocumentKind kind) {
             }
             has_description = true;
             metadata.description = value;
+        } else if (key == "layout") {
+            if (has_layout) {
+                throw std::runtime_error("Duplicate front matter key: layout");
+            }
+            has_layout = true;
+            if (value.empty()) {
+                throw std::runtime_error("Invalid front matter: 'layout' must be non-empty");
+            }
+            metadata.layout = value;
         } else if (key == "draft") {
             if (has_draft) {
                 throw std::runtime_error("Duplicate front matter key: draft");

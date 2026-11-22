@@ -6,8 +6,11 @@ install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" "${PROJECT_SOURCE_DIR}/README.md"
               "${PROJECT_SOURCE_DIR}/RELEASING.md"
     DESTINATION "${distribution_docs}" COMPONENT mizuki)
 
+install(DIRECTORY "${PROJECT_SOURCE_DIR}/docs/"
+    DESTINATION "${distribution_docs}/docs" COMPONENT mizuki)
+
 set(CPACK_SOURCE_INSTALLED_DIRECTORIES "${PROJECT_SOURCE_DIR};/")
-foreach(dependency spdlog md4c efsw httplib tomlplusplus)
+foreach(dependency spdlog md4c efsw httplib tomlplusplus json inja)
     FetchContent_GetProperties(${dependency} SOURCE_DIR dependency_source)
     if(NOT IS_DIRECTORY "${dependency_source}")
         message(FATAL_ERROR "Missing source for distribution dependency: ${dependency}")
@@ -16,6 +19,8 @@ foreach(dependency spdlog md4c efsw httplib tomlplusplus)
         set(dependency_license "${dependency_source}/LICENSE")
     elseif(EXISTS "${dependency_source}/LICENSE.md")
         set(dependency_license "${dependency_source}/LICENSE.md")
+    elseif(EXISTS "${dependency_source}/LICENSE.MIT")
+        set(dependency_license "${dependency_source}/LICENSE.MIT")
     else()
         message(FATAL_ERROR "Missing license for distribution dependency: ${dependency}")
     endif()

@@ -2,6 +2,8 @@
 
 一个用 C++ 编写的轻量静态博客框架，支持站点初始化、文章创建、Markdown 文章、独立页面、TOML 站点配置、本地预览和自动刷新。
 
+[在线文档](https://blog.cglab.top/Mizuki/)使用 Mizuki 自身构建，包含[快速开始](docs/content/pages/getting-started.md)、[主题开发](docs/content/pages/themes.md)、[架构设计](docs/content/pages/architecture.md)与[部署指南](docs/content/pages/deployment.md)。本地预览方法见 [docs/README.md](docs/README.md)。
+
 ## 下载与快速开始
 
 版本发布后，可从仓库的 Releases 页面下载对应系统的压缩包。日常建站无需安装编译器、CMake、Git 或 Python；默认主题已包含在程序中。
@@ -131,7 +133,7 @@ query 和 fragment 保留；外部地址、`//` 地址、纯锚点保持原样�
 
 `serve` 使用相同的部署路径。例如运行 `mizuki serve --base-url /blog/` 后访问 `http://127.0.0.1:3939/blog/`；`/blog` 会重定向到 `/blog/`，前缀之外的地址返回 404。静态文件与自动刷新 SSE 均使用该前缀。修改 `base_url` 后，构建成功才切换预览路径，并通知已打开的页面转到新路径，保留页面路径、query 和 fragment；构建失败时保留旧输出、旧预览路径和刷新版本。
 
-完整的 GitHub Pages 配置和工作流示例见 [部署指南](docs/deployment.md)。
+完整的 GitHub Pages 配置和工作流示例见 [部署指南](docs/content/pages/deployment.md)。
 
 ## 内容与独立页面
 
@@ -161,6 +163,7 @@ draft: false
 - 普通文章必须有有效的 `date`，严格使用 `YYYY-MM-DD`，年份为 0001–9999，并校验闰年与每月天数。首页、归档与 RSS 按日期降序排列，相同日期按输出 URL 排序。未来日期仍会发布，不做定时发布处理。原先使用任意日期文本的文章需要先改为此格式。
 - 内容根目录下 `pages/` 内的 Markdown 是独立页面，使用 `layouts/page.html`，允许省略 `date`；若提供日期则使用同一套格式与日历校验。独立页面不进入首页文章列表，可以加入导航。
 - `description` 是可选的单行纯文本，可用成对的单引号或双引号包裹。默认主题用它作为页面的 meta description，省略或为空时回退到站点 `description`；RSS 仅在文章自身有描述时输出摘要，不从正文自动截取。
+- `layout: special/project.html` 可为文章或独立页面选择主题 `layouts/` 下的模板，省略时分别使用 `post.html` 或 `page.html`。
 - `draft: true` 跳过页面，不生成 HTML，不占用输出路径。草稿仍需有合法的 front matter。
 - 键名重复、缺少结束 `---` 或格式错误会导致构建失败。Front matter 只支持简单 `key: value` 行，不支持 YAML 注释、列表或嵌套结构；站点配置单独使用 TOML。
 
@@ -179,9 +182,35 @@ Markdown 文内的本地 `.md` 链接会改写为目标 `.html`，支持相对�
 
 `.md` 到 `.html` 的改写仅作用于真实链接的 `href`，包括正文中原始 HTML 的 `<a href="...md">`。图片和其他资源中的 `.md` 不转换为页面链接。
 
-正文的根路径资源也会带上部署前缀：包括 `img`、`source`、`script`、`audio`、`video`、`iframe`、`input`、`track`、`embed` 的 `src`，`link` 的 `href`、`video` 的 `poster` 和 `object` 的 `data`。相对资源路径保持原样。普通文字、代码、HTML 注释和 script/style/textarea/title 的文本内容不改写。不会验证 fragment 对应的锚点，也不会自动为标题生成 ID。
+正文的根路径资源也会带上部署前缀：包括 `img`、`source`、`script`、`audio`、`video`、`iframe`、`input`、`track`、`embed` 的 `src`，`link` 的 `href`、`video` 的 `poster` 和 `object` 的 `data`。相对资源路径保持原样。普通文字、代码、HTML 注释和 script/style/textarea/title 的文本内容不改写。fragment 保留原样，不验证对应锚点是否存在；标题 ID 的生成规则见下节。
 
-URL 改写只处理 Markdown 渲染出的正文。原样复制的 HTML、CSS、模板中写死的地址和 `srcset` 不自动改写：模板使用 `{asset_base}` 或 `{base_path}`，CSS 的 `url(...)` 相对样式文件书写，`srcset` 相对当前页面书写。
+URL 改写只处理 Markdown 渲染出的正文。原样复制的 HTML、CSS、模板中写死的地址和 `srcset` 不自动改写：模板使用 `{{ asset_base }}` 或 `{{ site.base_path }}`，CSS 的 `url(...)` 相对样式文件书写，`srcset` 相对当前页面书写。
+
+## 标题锚点与文章目录
+
+文章与独立页面的正文标题会自动获得 ID，并在标题末尾显示可直接打开或分享的 `#` 章节链接。ATX 标题（`#` 至 `######`）和 Setext 标题使用相同规则；代码块、HTML 注释及 script/style/textarea/title 等原始文本元素中的内容不参与标题识别。
+
+ID 按标题的实际文字生成，强调、行内代码和链接保留原有格式，图片使用替代文字。HTML 实体先解码，连续空白（包括全角空格）合并。生成规则为：
+
+- ASCII 大写字母转为小写，保留字母、数字、`-`、`_` 和非 ASCII 字符（包括中文及中文标点）；不做 Unicode 大小写转换或规范化。
+- 单词间空白转为 `-`，其余 ASCII 标点移除。例如 ``## *安装* 与 `C++` `` 得到 `安装-与-c`，`## A & B` 得到 `a-b`。
+- 相同 ID 按正文顺序添加 `-2`、`-3` 等后缀，并避开当前正文中已经使用的 ID。例如两处 `## 安装` 分别得到 `安装` 和 `安装-2`。
+- 空标题或只含被移除标点的标题使用 `section`，重复时同样添加后缀。手写 HTML 的 `h1` 至 `h6` 也参与标题处理，保留已有的非空 ID；新 ID 会避开正文中所有手写 ID，包括位于后面的 ID。作者提供的重复 ID 不会自动修正。
+
+ID 仅在当前页面内分配，相同输入重复构建得到相同结果。标题文字或同名标题顺序改变后，应相应更新指向它的链接。章节链接使用 URL 编码，HTML 的 ID 保留原始文字。例如：
+
+```md
+## 安装
+
+[本页安装说明](#安装)
+[另一篇文章的章节](../pages/about.md#安装)
+```
+
+默认主题在文章与独立页面正文前展示目录，仅列出二、三级标题。三级标题嵌套于前面的二级标题；没有所属二级标题时作为顶层条目，一级标题会结束前一个二级标题的归属范围。没有二、三级标题时不输出目录。空标题在目录中显示为“（无标题）”。
+
+自定义主题通过 `toc` 标题树与 `page.headings` 数组自行组织目录，也可使用默认主题的 `{% include "partials/toc.html" %}`。默认目录使用原生 `<details open>`，默认展开，可用鼠标或键盘折叠，关闭 JavaScript 仍能跳转。可通过 `.toc` 和 `.heading-anchor` 调整样式，或在站点 `[extra]` 中设置 `show_toc = false` 隐藏目录。
+
+原样复制的 HTML 文件不参与此处理。站内 Markdown 链接继续只检查目标页面是否发布，不检查 fragment 是否存在。
 
 ## RSS、sitemap 与规范地址
 
@@ -196,7 +225,7 @@ base_url = "https://example.com/blog/"
 - RSS 2.0 只包含已发布文章，使用标题、发布日期、可选描述和页面完整地址；文章地址也作为稳定的 GUID。独立页面、草稿和原样复制的 HTML 不进入订阅源。
 - 发布日期只有日历日期，RSS 将其明确表示为当天 `00:00:00 GMT`，不依赖本机时区或语言环境。订阅源不写入当前构建时间，相同输入的输出保持一致。
 - sitemap 包含生成的首页、已发布文章和独立页面。首页使用站点根地址，其余页面使用实际 `.html` 地址；不将发布日期或文件时间冒充最后修改时间。当前生成单个文件，最多 50,000 个地址、50 MiB，单个地址少于 2,048 字符；超限会报错，不自动拆分。
-- 默认主题在首页、文章和独立页面的 `<head>` 中加入 canonical 和 RSS 自动发现链接，在页脚显示 RSS 入口。自定义主题可使用下表中的可选占位符。
+- 默认主题在首页、文章和独立页面的 `<head>` 中加入 canonical 和 RSS 自动发现链接，在页脚显示 RSS 入口。自定义主题使用 `page.canonical_url` 与 `feed_url` 自行输出标签。
 
 当 `base_url` 只是 `/` 或 `/blog/` 时，正常构建和预览，并打印说明；不生成这两个 XML 文件，也不插入 canonical 和订阅链接。切换配置后，下一次成功构建会移除旧的生成文件。没有完整发布地址时，内容目录里自行提供的同名 XML 仍可原样复制。
 
@@ -225,32 +254,42 @@ url = "/archives/"
 
 分页输出与归档也参与构建前的路径冲突检查。文章删除、改为草稿、调大分页数量或关闭功能后，下次成功构建会清除多余页面；失败保留之前的完整输出。关闭归档前应同时移除指向 `/archives/` 的导航，否则会因目标不存在而报错。
 
-自定义主题需要在 `layouts/home.html` 放入 `{pagination}` 才能显示分页导航。只有实际产生多页时，这个占位符才是必需的；缺失时构建明确报错，避免旧文章失去入口。启用归档还需要提供 `layouts/archives.html`，其中必须包含 `{archives}` 和 `{asset_base}`。默认关闭这两项时，旧主题无需调整。
+自定义主题通过 `pagination` 对象编写分页导航，通过 `archives` 数组编写年份归档。启用归档需要提供 `layouts/archives.html`，具体标记与样式由主题决定。
 
 ## 主题模板
 
-| 模板 | 必需占位符 | 用途 |
-| --- | --- | --- |
-| `layouts/home.html` | `{asset_base}`、`{posts}`；实际多页时还需 `{pagination}` | 首页及后续分页；不读取 `content/index.md` |
-| `layouts/archives.html` | `{asset_base}`、`{archives}` | 按年份分组的归档；仅启用归档时需要 |
-| `layouts/post.html` | `{markdown}`、`{asset_base}`、`{title}`、`{date}` | 普通文章 |
-| `layouts/page.html` | `{markdown}`、`{asset_base}`、`{title}` | 独立页面；没有已发布独立页面时无需此模板 |
+主题统一使用 Inja，支持 `{{ expression }}`、`{% if %}`、`{% for %}`、`include` 与 `extends`。旧单花括号占位符已移除，没有兼容模式。完整数据字段、组件、继承与迁移方法见 [主题开发指南](docs/content/pages/themes.md)。
 
-`{asset_base}` 是相对当前页面的主题资源目录，包含结尾 `/`；`{posts}` 是当前页的已发布文章 HTML 列表；`{archives}` 是完整的年份分组 HTML。首页模板还可选用 `{title}`（第一页为站点标题，后续页附加页码）、`{page_number}` 和 `{page_count}`；页码从 1 开始。`{pagination}` 是完整的分页导航 HTML，只有一页时为空。文章和独立页面都可使用 `{date}`，独立页面省略日期时替换为空字符串。
-
-所有模板还可选用 `{site_title}`、`{site_description}`、`{site_author}`、`{site_language}`、`{navigation}`、`{base_url}` 和 `{base_path}`。`{base_url}` 是规范化后的完整配置地址，`{base_path}` 是规范化后的部署路径，两者都包含结尾 `/`。这些站点占位符均可省略，现有主题仍可使用。文本和属性值会转义 HTML；正文、文章列表和导航作为 HTML 插入。替换值中的占位符不会再次替换。
-
-发布信息还提供以下可选占位符，旧主题无需修改即可继续使用：
-
-| 占位符 | 内容 |
+| 默认入口 | 用途 |
 | --- | --- |
-| `{description}` | 首页、后续分页和归档使用站点描述；文章与独立页面优先使用自身描述，为空时回退到站点描述。作为文本转义 |
-| `{canonical_url}` | 当前页面的完整规范地址；首页为站点根地址。未配置域名时为空，作为文本转义 |
-| `{feed_url}` | RSS 的完整地址；未配置域名时为空，作为文本转义 |
-| `{publication_head}` | 完整的 canonical 和 RSS 自动发现 `<link>` 标签，放入 `<head>`；未配置域名时为空 |
-| `{feed_link}` | 完整的 RSS `<a>` 标签，可放入页脚；未配置域名时为空 |
+| `layouts/home.html` | 首页及后续分页，获得当前页 `posts` 和 `pagination` |
+| `layouts/archives.html` | 年份归档，获得完整的 `archives` 分组；启用归档时使用 |
+| `layouts/post.html` | 普通文章，获得 `page`、`toc` 与 `page.headings` |
+| `layouts/page.html` | 独立页面，获得相同的正文与标题数据 |
 
-主题 `assets/` 中的文件复制到输出 `assets/`，内容目录的非 Markdown 文件按相对路径复制。
+默认主题通过 `base.html` 共享基础结构，通过 `partials/` 组织导航、列表、分页、目录和页脚。主题可自由调整页面结构，不要求出现固定变量。例如文章列表可以直接写为：
+
+```html
+{% for post in posts %}
+<article>
+  <h2><a href="{{ post.url }}">{{ post.title }}</a></h2>
+  <p>{{ post.description }}</p>
+  <time>{{ post.date }}</time>
+</article>
+{% endfor %}
+```
+
+所有入口都获得站点元数据 `site`、当前页面 `page`、导航 `navigation`、相对资源路径 `asset_base` 和订阅地址 `feed_url`。字符串默认进行 HTML 转义，Markdown 正文通过 `{{ html(page.content) }}` 显式输出为 HTML。变量内容不会再次解析成模板。
+
+主题可在 `theme.toml` 的 `[extra]` 中定义默认参数，站点 `mizuki.toml` 的 `[extra]` 覆盖这些参数，模板通过 `site.extra` 读取。表递归合并，数组和标量整体替换。默认主题可这样定制：
+
+```toml
+[extra]
+show_toc = false
+footer_text = "我的博客"
+```
+
+在文档 front matter 中设置 `layout: special/project.html`，即可选择该主题 `layouts/` 下的专用布局。主题 `assets/` 中的文件复制到输出 `assets/`，内容目录的非 Markdown 文件按相对路径复制。主题配置、布局和组件变化都会触发预览重建。
 
 ## 路径冲突与输出管理
 
@@ -293,7 +332,7 @@ ctest --test-dir build --output-on-failure
 
 默认预览地址是 `http://127.0.0.1:3939`，按 Ctrl+C 退出。`--port` 仅用于 `serve`，范围为 1–65535；端口占用会报错退出。
 
-CMake 使用 spdlog、md4c、efsw、cpp-httplib 和 toml++。依赖版本在 `cmake/third_party_*.cmake` 中固定；可用的 spdlog、md4c 和 toml++ 安装包会优先被查找，其余通过 FetchContent 下载，首次配置需要网络。加入 `-DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER` 可全部使用项目固定的源码依赖。不需要测试时可设 `-DBUILD_TESTING=OFF`，无需 Python。
+CMake 使用 spdlog、md4c、efsw、cpp-httplib、toml++、Inja 和 nlohmann/json。依赖版本在 `cmake/third_party_*.cmake` 中固定；可用的 spdlog、md4c 和 toml++ 安装包会优先被查找，其余通过 FetchContent 下载，首次配置需要网络。加入 `-DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER` 可全部使用项目固定的源码依赖。不需要测试时可设 `-DBUILD_TESTING=OFF`，无需 Python。
 
 Linux 安装 Ninja 后，也可使用 `linux-debug` / `linux-release` presets：
 

@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,7 @@ struct SiteMetadata {
     std::string description{"一个用 C++ 编写的轻量博客框架"};
     std::string author;
     std::string language{"zh-CN"};
+    nlohmann::json extra = nlohmann::json::object();
     std::vector<NavigationItem> navigation{{"首页", "/"}};
 };
 

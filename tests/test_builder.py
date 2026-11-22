@@ -59,8 +59,8 @@ class BuilderTests(BuilderFixture):
 
     def test_homepage_template_controls_layout_and_lists_articles_by_date(self):
         (self.theme / "layouts/home.html").write_text(
-            '<!doctype html><title>Custom home</title><link href="{asset_base}site.css">'
-            '<main><ul>{posts}</ul></main>',
+            '<!doctype html><title>Custom home</title><link href="{{ asset_base }}site.css">'
+            '<main><ul>{% include "partials/posts.html" %}</ul></main>',
             encoding="utf-8",
         )
         self.write_page(
@@ -105,7 +105,7 @@ class BuilderTests(BuilderFixture):
         self.write_page("posts/draft.md", "Draft only", "Unpublished.", draft=True)
         self.build()
         homepage = (self.output / "index.html").read_text()
-        self.assertIn('<ul class="post-list">\n      </ul>', homepage)
+        self.assertRegex(homepage, r'<ul class="post-list">\s*</ul>')
         self.assertNotIn("Draft only", homepage)
 
     def test_deleted_content_and_theme_assets_disappear(self):
@@ -156,7 +156,7 @@ class BuilderTests(BuilderFixture):
         self.build()
         before = self.snapshot()
         layout = self.theme / "layouts/post.html"
-        for invalid in ("<html>Missing placeholders</html>", None):
+        for invalid in ("{{ missing_value }}", None):
             with self.subTest(template=invalid):
                 if invalid is None:
                     layout.unlink()
@@ -164,9 +164,9 @@ class BuilderTests(BuilderFixture):
                     layout.write_text(invalid)
                 error = self.build(success=False)
                 self.assertIn(layout.as_posix(), error)
-                self.assertIn("Failed to load template" if invalid is None else "Missing required placeholder", error)
+                self.assertIn("Failed to load template" if invalid is None else "variable 'missing_value' not found", error)
                 if invalid is not None:
-                    self.assertIn("{markdown}", error)
+                    self.assertIn("missing_value", error)
                 self.assertEqual(self.snapshot(), before)
                 self.assert_no_temporary_directories()
 
@@ -174,7 +174,7 @@ class BuilderTests(BuilderFixture):
         self.build()
         before = self.snapshot()
         layout = self.theme / "layouts/home.html"
-        for invalid in ("<html>Missing placeholders</html>", None):
+        for invalid in ("{{ missing_value }}", None):
             with self.subTest(template=invalid):
                 if invalid is None:
                     layout.unlink()
@@ -182,9 +182,9 @@ class BuilderTests(BuilderFixture):
                     layout.write_text(invalid, encoding="utf-8")
                 error = self.build(success=False)
                 self.assertIn(layout.as_posix(), error)
-                self.assertIn("Failed to load template" if invalid is None else "Missing required placeholder", error)
+                self.assertIn("Failed to load template" if invalid is None else "variable 'missing_value' not found", error)
                 if invalid is not None:
-                    self.assertIn("{asset_base}", error)
+                    self.assertIn("missing_value", error)
                 self.assertEqual(self.snapshot(), before)
                 self.assert_no_temporary_directories()
 

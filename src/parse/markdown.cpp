@@ -1,5 +1,6 @@
 #include "parse/markdown.hpp"
 
+#include "parse/headings.hpp"
 #include "util/file.hpp"
 #include "util/path.hpp"
 
@@ -26,7 +27,7 @@ Document read_document(std::filesystem::path const& path, DocumentKind kind) {
     }
 }
 
-std::string render_markdown(std::string_view body) {
+RenderedMarkdown render_markdown(std::string_view body) {
     if (body.size() > std::numeric_limits<MD_SIZE>::max()) {
         throw std::runtime_error("Markdown document exceeds parser size limit");
     }
@@ -36,7 +37,7 @@ std::string render_markdown(std::string_view body) {
     if (result != 0) {
         throw std::runtime_error("Failed to convert Markdown");
     }
-    return html;
+    return add_heading_anchors(html);
 }
 
 } // namespace mizuki

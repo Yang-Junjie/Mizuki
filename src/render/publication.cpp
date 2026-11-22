@@ -58,21 +58,6 @@ std::string escape_xml(std::string_view text) {
 
 } // namespace
 
-PublicationLinks render_publication_links(BaseUrl const& base, std::string_view output_path,
-                                          std::string_view site_title) {
-    PublicationLinks links;
-    links.canonical_url = published_url(base, output_path);
-    links.feed_url = published_url(base, "rss.xml");
-    if (!links.canonical_url.empty()) {
-        links.head = "<link rel=\"canonical\" href=\"" + escape_html(links.canonical_url) + "\">\n";
-        links.head += "  <link rel=\"alternate\" type=\"application/rss+xml\" title=\"" +
-                      escape_html(site_title) + "\" href=\"" + escape_html(links.feed_url) + "\">";
-        links.feed_link =
-            "<a class=\"feed-link\" href=\"" + escape_html(links.feed_url) + "\">RSS</a>";
-    }
-    return links;
-}
-
 std::string render_rss(SiteMetadata const& site, BaseUrl const& base,
                        std::span<ArticleSummary const> articles) {
     auto const home = escape_xml(published_url(base, ""));

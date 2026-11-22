@@ -253,13 +253,13 @@ class PublicationTests(BuilderFixture):
                 path.write_bytes(b"---\ntitle: First\ndate: 2026-11-22\ndescription: " + invalid + b"\n---\nBody.\n")
                 self.assert_failure_preserves_output("Invalid UTF-8 or XML character")
 
-    def test_optional_publication_placeholders_are_escaped_and_replaced_once(self):
+    def test_publication_data_is_escaped_and_not_evaluated_as_template(self):
         self.write_page("posts/first.md", "First", "Body.", description="{site_title} & <summary>")
         self.configure(title="Site")
-        for name in ("home", "post"):
-            path = self.theme / f"layouts/{name}.html"
-            path.write_text(path.read_text(encoding="utf-8") +
-                            '<p>{description}</p><p>{canonical_url}</p><p>{feed_url}</p>', encoding="utf-8")
+        path = self.theme / "layouts/base.html"
+        path.write_text(path.read_text(encoding="utf-8").replace("</body>",
+                        '<p>{{ page.description }}</p><p>{{ page.canonical_url }}</p>'
+                        '<p>{{ feed_url }}</p></body>'), encoding="utf-8")
         self.build()
         post = (self.output / "posts/first.html").read_text(encoding="utf-8")
         self.assertIn("<p>{site_title} &amp; &lt;summary&gt;</p>", post)

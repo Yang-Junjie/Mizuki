@@ -2,7 +2,7 @@
 
 #include "config/site.hpp"
 #include "parse/front_matter.hpp"
-#include "render/article_list.hpp"
+#include "render/article.hpp"
 
 #include <cstddef>
 #include <filesystem>

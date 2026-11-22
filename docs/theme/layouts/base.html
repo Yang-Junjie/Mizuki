@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="{{ site.language }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="{{ page.description }}">
+  <meta name="generator" content="Mizuki">
+  <meta name="color-scheme" content="light dark">
+  <title>{{ page.title }}{% if page.kind != "home" %} · {{ site.title }}{% endif %}</title>
+{% if page.canonical_url != "" %}  <link rel="canonical" href="{{ page.canonical_url }}">
+{% endif %}  <link rel="stylesheet" href="{{ asset_base }}css/docs.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="site-header">
+    <a class="brand" href="{{ site.base_path }}" aria-label="Mizuki 文档首页"><span class="brand-mark" aria-hidden="true">M</span><span>Mizuki <small>文档</small></span></a>
+    <span class="header-note">一个用 C++ 编写的静态博客框架</span>
+    <a class="repository-link" href="{{ site.extra.repository_url }}">GitHub <span aria-hidden="true">↗</span></a>
+  </header>
+  <div class="docs-shell">
+    {% include "partials/navigation.html" %}
+    <main id="main" class="main" tabindex="-1">
+{% block content %}{% endblock %}
+      <footer class="page-footer">
+        <p>{{ site.extra.footer_text }}</p>
+        <a href="{{ site.extra.repository_url }}/tree/main/docs/content/pages">查看文档源码 <span aria-hidden="true">↗</span></a>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

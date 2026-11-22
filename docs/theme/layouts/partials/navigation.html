@@ -1,0 +1,13 @@
+<aside class="sidebar">
+  <details class="site-navigation" open>
+    <summary>文档导航</summary>
+    <nav aria-label="文档导航">
+{% for item in navigation %}      <a href="{{ item.url }}"{% if item.url == page.url or (page.kind == "home" and loop.is_first) %} aria-current="page"{% endif %}>{{ item.title }}</a>
+{% endfor %}    </nav>
+  </details>
+  <div class="sidebar-note">
+    <span class="eyebrow">BUILT WITH MIZUKI</span>
+    <p>这个文档站本身也是一个 Mizuki 站点。</p>
+    <a href="{{ site.extra.repository_url }}/tree/main/docs/theme">阅读本站主题源码 ↗</a>
+  </div>
+</aside>

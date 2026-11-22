@@ -152,7 +152,7 @@ class DevTests(BuilderFixture):
         css = self.theme / "assets/css/style.css"
         css.write_text("body { color: red; }", encoding="utf-8")
         self.wait_for(lambda: self.disk_contains(self.output / "assets/css/style.css", "red"), "theme asset edit")
-        layout = self.theme / "layouts/post.html"
+        layout = self.theme / "layouts/base.html"
         layout.write_text(layout.read_text(encoding="utf-8").replace("<body>", "<body>Template edit"), encoding="utf-8")
         self.wait_for(lambda: self.disk_contains(renamed, "Template edit"), "layout edit")
         (self.content / "posts/renamed.md").unlink()
@@ -215,6 +215,30 @@ class DevTests(BuilderFixture):
         self.write_page("posts/first.md", "Recovered", "Recovered body.")
         self.wait_for(lambda: self.http_contains("/posts/first.html", "Recovered body."), "build recovery")
         self.assertGreater(self.event(recovered), initial)
+        self.assert_no_temporary_directories()
+
+    def test_theme_partials_defaults_and_extra_reload_and_recover(self):
+        self.start()
+        self.configure('theme = "theme"\n[extra]\nfooter_text = "Site footer"\n')
+        self.wait_for(lambda: self.http_contains("/", "Site footer"), "site theme parameters")
+        partial = self.theme / "layouts/partials/footer.html"
+        original = partial.read_text(encoding="utf-8")
+        partial.write_text(original.replace("<footer>", "<footer>Partial update"), encoding="utf-8")
+        self.wait_for(lambda: self.http_contains("/", "Partial update"), "partial update")
+        self.configure('theme = "theme"\n')
+        manifest = self.theme / "theme.toml"
+        text = manifest.read_text(encoding="utf-8")
+        manifest.write_text(text.replace('footer_text = ""', 'footer_text = "Theme footer"'), encoding="utf-8")
+        self.wait_for(lambda: self.http_contains("/", "Theme footer"), "theme defaults update")
+        before = self.snapshot()
+        version = self.version()
+        manifest.write_text('engine = "legacy"', encoding="utf-8")
+        self.wait_for(lambda: "Theme engine must be 'inja'" in self.logs(), "theme error diagnostic")
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(self.version(), version)
+        manifest.write_text(text.replace('footer_text = ""', 'footer_text = "Recovered theme"'), encoding="utf-8")
+        self.wait_for(lambda: self.http_contains("/", "Recovered theme"), "theme recovery")
+        self.assertGreater(self.version(), version)
         self.assert_no_temporary_directories()
 
     def test_config_atomic_reload_invalid_delete_recreate_and_cli_precedence(self):

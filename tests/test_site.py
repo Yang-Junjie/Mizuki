@@ -393,10 +393,10 @@ url = "https://example.com/path?q=1&x=2"
                 self.assertFalse((self.output / "blog").exists())
 
     def test_base_url_template_values_are_normalized_and_optional(self):
-        for layout in ("home.html", "post.html", "page.html"):
-            path = self.theme / "layouts" / layout
-            path.write_text(path.read_text(encoding="utf-8") +
-                            '<a href="{base_path}download.bin">Download</a><p>{base_url}</p>', encoding="utf-8")
+        path = self.theme / "layouts/base.html"
+        path.write_text(path.read_text(encoding="utf-8").replace("</body>",
+                        '<a href="{{ site.base_path }}download.bin">Download</a>'
+                        '<p>{{ site.base_url }}</p></body>'), encoding="utf-8")
         self.independent()
         for base_url, expected_url, prefix in (
             ("https://example.com", "https://example.com/", "/"),
@@ -465,9 +465,9 @@ url = "https://example.com/path?q=1&x=2"
                 self.assertEqual(self.snapshot(), before)
                 self.assert_no_temporary_directories()
 
-    def test_legacy_custom_templates_remain_supported(self):
-        (self.theme / "layouts/home.html").write_text("<main>{posts}</main><link href='{asset_base}css/style.css'>")
-        (self.theme / "layouts/post.html").write_text("<h1>{title}</h1><time>{date}</time>{markdown}<link href='{asset_base}css/style.css'>")
+    def test_custom_templates_use_structured_data(self):
+        (self.theme / "layouts/home.html").write_text('<main>{% include "partials/posts.html" %}</main><link href="{{ asset_base }}css/style.css">' )
+        (self.theme / "layouts/post.html").write_text('<h1>{{ page.title }}</h1><time>{{ page.date }}</time>{{ html(page.content) }}<link href="{{ asset_base }}css/style.css">' )
         self.config('title = "Custom site"')
         self.build()
         self.assertIn("First post", self.read())

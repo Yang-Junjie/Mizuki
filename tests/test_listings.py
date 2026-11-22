@@ -82,10 +82,10 @@ class ListingTests(BuilderFixture):
         self.assertEqual(self.snapshot(), before)
         self.assert_no_temporary_directories()
 
-    def test_disabled_by_default_preserves_old_theme_and_output(self):
+    def test_disabled_features_do_not_require_archive_layout(self):
         expected = self.populate()
         home = self.theme / "layouts/home.html"
-        home.write_text('<title>Old theme</title><ul>{posts}</ul><link href="{asset_base}css/style.css">', encoding="utf-8")
+        home.write_text('<title>Custom theme</title><ul>{% include "partials/posts.html" %}</ul>', encoding="utf-8")
         (self.theme / "layouts/archives.html").unlink()
         self.build()
         self.assertEqual(self.resolved_posts(prefix="/"), expected)
@@ -188,18 +188,17 @@ class ListingTests(BuilderFixture):
                 self.assertEqual(bool(self.listing().pagination()), expected > 1)
                 self.assertFalse((self.output / "archives").exists())
 
-    def test_missing_pagination_placeholder_fails_only_when_multiple_pages_exist(self):
+    def test_theme_can_choose_its_own_pagination_markup(self):
         home = self.theme / "layouts/home.html"
-        home.write_text(home.read_text(encoding="utf-8").replace("{pagination}", ""), encoding="utf-8")
+        home.write_text(home.read_text(encoding="utf-8").replace(
+            '{% include "partials/pagination.html" %}', ""), encoding="utf-8")
         self.configure(paginate_by=1)
-        self.build()
         self.write_page("posts/second.md", "Second", "Body.")
-        self.assert_failure_preserves_output("Missing required placeholder '{pagination}'", "home.html")
-        home.write_text(home.read_text(encoding="utf-8") + "{pagination}", encoding="utf-8")
         self.build()
         self.assertTrue((self.output / "page/2/index.html").is_file())
+        self.assertFalse(self.listing().pagination())
 
-    def test_archive_template_is_required_only_when_enabled_and_needs_content_placeholder(self):
+    def test_archive_template_is_required_only_when_enabled(self):
         template = self.theme / "layouts/archives.html"
         source = template.read_text(encoding="utf-8")
         template.unlink()
@@ -207,8 +206,8 @@ class ListingTests(BuilderFixture):
         self.build()
         self.configure()
         self.assert_failure_preserves_output("Failed to load template", "archives.html")
-        template.write_text(source.replace("{archives}", ""), encoding="utf-8")
-        self.assert_failure_preserves_output("Missing required placeholder '{archives}'", "archives.html")
+        template.write_text('{{ missing_archive }}', encoding="utf-8")
+        self.assert_failure_preserves_output("missing_archive", "archives.html")
         template.write_text(source, encoding="utf-8")
         self.build()
         self.assertTrue((self.output / "archives/index.html").is_file())
@@ -280,7 +279,8 @@ class ListingTests(BuilderFixture):
         self.populate()
         self.configure(title="Site {page_number} <&")
         home = self.theme / "layouts/home.html"
-        home.write_text(home.read_text(encoding="utf-8") + "<p>{page_number}/{page_count}</p>", encoding="utf-8")
+        home.write_text(home.read_text(encoding="utf-8").replace("</main>",
+                        "<p>{{ pagination.current_page }}/{{ pagination.total_pages }}</p></main>"), encoding="utf-8")
         self.build()
         self.assertIn("Site {page_number} &lt;&amp;", self.read())
         self.assertIn("<p>2/3</p>", self.read("page/2/index.html"))

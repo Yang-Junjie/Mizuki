@@ -13,6 +13,15 @@ add_test(NAME mizuki.builder
 add_test(NAME mizuki.site
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_site.py"
             "$<TARGET_FILE:mizuki>")
+add_test(NAME mizuki.reading
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_reading.py"
+            "$<TARGET_FILE:mizuki>")
+add_test(NAME mizuki.theme
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_theme.py"
+            "$<TARGET_FILE:mizuki>")
+add_test(NAME mizuki.docs
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_docs.py"
+            "$<TARGET_FILE:mizuki>")
 add_test(NAME mizuki.dev
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_dev.py"
             "$<TARGET_FILE:mizuki>")
@@ -40,9 +49,9 @@ target_link_libraries(mizuki_core_tests PRIVATE mizuki_core)
 mizuki_configure_target(mizuki_core_tests)
 add_test(NAME mizuki.core COMMAND mizuki_core_tests)
 
-set_tests_properties(mizuki.builder mizuki.site mizuki.publication mizuki.listings mizuki.scaffold mizuki.output_transaction mizuki.core PROPERTIES TIMEOUT 60)
+set_tests_properties(mizuki.builder mizuki.site mizuki.reading mizuki.theme mizuki.docs mizuki.publication mizuki.listings mizuki.scaffold mizuki.output_transaction mizuki.core PROPERTIES TIMEOUT 60)
 set_tests_properties(mizuki.dev PROPERTIES TIMEOUT 120)
-set_tests_properties(mizuki.builder mizuki.site mizuki.dev mizuki.publication mizuki.listings mizuki.scaffold PROPERTIES ENVIRONMENT "PYTHONUTF8=1")
+set_tests_properties(mizuki.builder mizuki.site mizuki.reading mizuki.theme mizuki.docs mizuki.dev mizuki.publication mizuki.listings mizuki.scaffold PROPERTIES ENVIRONMENT "PYTHONUTF8=1")
 
 if(MIZUKI_BUILD_DISTRIBUTION)
     find_package(Python3 3.12 REQUIRED COMPONENTS Interpreter)

@@ -3,19 +3,19 @@ include("${PROJECT_SOURCE_DIR}/cmake/embed_theme.cmake")
 # Build logic is reusable without bringing in HTTP or file watching.
 add_library(mizuki_core STATIC
     build/builder.cpp
+    build/context.cpp
     build/links.cpp
     build/output_transaction.cpp
     build/paths.cpp
     build/plan.cpp
     config/config.cpp
+    config/values.cpp
     parse/front_matter.cpp
+    parse/headings.cpp
     parse/markdown.cpp
-    render/article_list.cpp
     render/html_links.cpp
-    render/navigation.cpp
-    render/pagination.cpp
     render/publication.cpp
-    render/template.cpp
+    render/theme.cpp
     scaffold/content.cpp
     scaffold/files.cpp
     scaffold/site.cpp
@@ -28,7 +28,8 @@ add_library(mizuki_core STATIC
 target_include_directories(mizuki_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
     PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(mizuki_core PRIVATE
-    spdlog::spdlog md4c md4c-html tomlplusplus::tomlplusplus)
+    spdlog::spdlog md4c md4c-html tomlplusplus::tomlplusplus pantor::inja
+    PUBLIC nlohmann_json::nlohmann_json)
 
 add_library(mizuki_dev STATIC
     dev/file_watcher.cpp

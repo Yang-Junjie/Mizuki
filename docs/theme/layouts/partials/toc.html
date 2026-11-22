@@ -1,0 +1,14 @@
+{% if site.extra.show_toc and length(toc) > 0 %}<aside class="table-of-contents">
+  <details open>
+    <summary>本页内容</summary>
+    <nav aria-label="本页目录">
+      <ol>
+{% for heading in toc %}        <li><a href="{{ heading.url }}">{{ heading.text }}</a>{% if length(heading.children) > 0 %}
+          <ol>
+{% for child in heading.children %}            <li><a href="{{ child.url }}">{{ child.text }}</a></li>
+{% endfor %}          </ol>
+{% endif %}        </li>
+{% endfor %}      </ol>
+    </nav>
+  </details>
+</aside>{% endif %}

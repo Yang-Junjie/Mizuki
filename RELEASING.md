@@ -16,7 +16,7 @@ ctest --test-dir build/distribution --output-on-failure
 
 需要 CMake 3.28 或更新版本、Ninja、Git、Python 3.12 或更新版本，以及 Linux GCC 或 Windows MSVC/ClangCL 工具链。Windows 在对应的开发者终端中运行，可将配置命令写在一行。分发构建目前只支持 x86_64。
 
-`MIZUKI_BUILD_DISTRIBUTION` 禁用系统依赖查找，使用项目固定的五个源码依赖并静态链接；Linux 额外静态链接 libstdc++/libgcc，Windows 使用静态 MSVC 运行库。日常构建默认关闭该选项，保留原有的系统依赖与运行库选择。
+`MIZUKI_BUILD_DISTRIBUTION` 禁用系统依赖查找，使用项目固定的源码依赖并静态链接；Linux 额外静态链接 libstdc++/libgcc，Windows 使用静态 MSVC 运行库。日常构建默认关闭该选项，保留原有的系统依赖与运行库选择。
 
 测试会调用 CPack，验证通过的文件保留在 `build/distribution/packages/`：
 
@@ -24,7 +24,7 @@ ctest --test-dir build/distribution --output-on-failure
 | --- | --- |
 | `mizuki-VERSION-linux-x86_64.tar.gz` | Linux 程序、使用说明、更新记录、项目与第三方许可证 |
 | `mizuki-VERSION-windows-x86_64.zip` | Windows 程序和同样的文档、许可证 |
-| `mizuki-VERSION-source.tar.gz` | 项目和全部五个依赖的源码；在 Linux 构建中生成 |
+| `mizuki-VERSION-source.tar.gz` | 项目和全部依赖的源码；在 Linux 构建中生成 |
 | 每个归档对应的 `.sha256` | SHA-256 摘要和归档文件名 |
 
 二进制包只有一个顶层目录，其中包含 `bin/mizuki` 或 `bin/mizuki.exe` 和 `share/mizuki/` 文档。依赖许可证直接取自本次构建使用的源码；fmt 的许可证从 spdlog 内置 fmt 头部提取。

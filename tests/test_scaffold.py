@@ -1,7 +1,7 @@
 """Site creation, content creation and preservation of existing user files."""
 
 from datetime import datetime
-from html import escape
+from html import unescape
 from pathlib import Path
 import shutil
 import subprocess
@@ -71,6 +71,11 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIn("欢迎使用 Mizuki", home)
         self.assertIn('href="archives/index.html"', home)
         self.assertIn('href="pages/about.html"', home)
+        welcome = (site / "dist/posts/welcome.html").read_text(encoding="utf-8")
+        self.assertIn('class="toc"', welcome)
+        self.assertIn('id="开始写作"', welcome)
+        self.assertIn('id="预览站点"', welcome)
+        self.assertIn('href="#%E5%BC%80%E5%A7%8B%E5%86%99%E4%BD%9C"', welcome)
 
     def test_init_accepts_existing_empty_directory_and_current_directory(self):
         for target in ("empty", "."):
@@ -175,10 +180,8 @@ class ScaffoldTests(unittest.TestCase):
         self.command("build", cwd=site)
         for index, title in enumerate(titles):
             page = (site / f"dist/posts/quotes-{index}.html").read_text(encoding="utf-8")
-            escaped_title = escape(title).replace("&#x27;", "&#39;")
-            escaped_description = escape(description).replace("&#x27;", "&#39;")
-            self.assertIn(f"<h1>{escaped_title}</h1>", page)
-            self.assertIn(f'content="{escaped_description}"', page)
+            self.assertIn(f"<h1>{title}</h1>", unescape(page))
+            self.assertIn(f'content="{description}"', unescape(page))
 
     def test_new_draft_is_excluded_from_build_and_archive(self):
         site = self.init()

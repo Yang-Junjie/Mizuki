@@ -1,0 +1,13 @@
+name = "Mizuki Docs"
+engine = "inja"
+
+[extra]
+show_toc = true
+repository_url = "https://github.com/Yang-Junjie/Mizuki"
+footer_text = "由 Mizuki 将 Markdown 与 Inja 主题构建为静态网页。"
+
+[extra.guide_descriptions]
+"快速开始" = "初始化站点、编写文章，配置导航并启动本地预览。"
+"主题开发" = "使用 Inja 编写布局，组合组件，定义参数与页面目录。"
+"架构设计" = "沿着一次构建，理解模块边界、链接解析与失败恢复。"
+"部署指南" = "将生成的静态文件发布到 GitHub Pages 或自己的域名。"

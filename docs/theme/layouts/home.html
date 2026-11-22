@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+      <section class="hero" aria-labelledby="home-title">
+        <p class="eyebrow">MIZUKI / DOCUMENTATION</p>
+        <h1 id="home-title">从一篇 Markdown，<br>到你自己的站点。</h1>
+        <p class="lead">{{ site.description }}<br>这个文档站，也由同一套框架生成。</p>
+        <div class="hero-actions">
+{% for item in navigation %}{% if item.title == "快速开始" %}          <a class="button" href="{{ item.url }}">开始使用 <span aria-hidden="true">→</span></a>
+{% endif %}{% if item.title == "主题开发" %}          <a class="text-link" href="{{ item.url }}">开发你的主题 <span aria-hidden="true">↗</span></a>
+{% endif %}{% endfor %}        </div>
+      </section>
+      <section class="guide-section" aria-labelledby="guides-title">
+        <div class="section-heading"><h2 id="guides-title">选择你的起点</h2><span>从使用到实现</span></div>
+        <div class="guide-grid">
+{% for item in navigation %}{% if not loop.is_first %}          <a class="guide-card" href="{{ item.url }}">
+            <span class="card-number">0{{ loop.index }}</span>
+            <h3>{{ item.title }} <span aria-hidden="true">↗</span></h3>
+{% if existsIn(site.extra.guide_descriptions, item.title) %}            <p>{{ at(site.extra.guide_descriptions, item.title) }}</p>
+{% endif %}
+          </a>
+{% endif %}{% endfor %}        </div>
+      </section>
+      <section class="home-example" aria-labelledby="example-title">
+        <div><p class="eyebrow">A SMALL START</p><h2 id="example-title">三个命令，<br>开始写作。</h2><p>主题可以完全修改。<br>发布后只需要静态文件托管。</p></div>
+        <pre><code>mizuki init my-blog
+cd my-blog
+mizuki serve</code></pre>
+      </section>
+{% endblock %}

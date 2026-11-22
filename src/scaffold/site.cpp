@@ -66,9 +66,14 @@ void init_site(fs::path const& directory) {
         throw std::runtime_error("Site directory must be empty: " + path_to_utf8(target));
     }
     target = fs::weakly_canonical(target);
-    auto const welcome = "---\ntitle: 欢迎使用 Mizuki\ndate: " + local_date() +
-                         "\n---\n\n这是你的第一篇文章，可以直接修改这份 Markdown 文件。\n\n"
-                         "[关于这个站点](../pages/about.md) · [返回首页](/index.md)\n";
+    auto const welcome =
+        "---\ntitle: 欢迎使用 Mizuki\ndate: " + local_date() +
+        "\n---\n\n这是你的第一篇文章，可以直接修改这份 Markdown 文件。\n\n"
+        "## 开始写作\n\n使用 `mizuki new posts/hello.md --title \"你好\"` 创建新文章。\n\n"
+        "### 预览站点\n\n运行 `mizuki serve`，在浏览器中预览修改。\n\n"
+        "## 章节链接\n\n标题会自动生成锚点，目录可以直接跳转到章节。\n\n"
+        "[回到开始写作](#开始写作)\n\n"
+        "[关于这个站点](../pages/about.md) · [返回首页](/index.md)\n";
     FileCreation files;
     files.write(target / "mizuki.toml", kConfig);
     files.write(target / "content/posts/welcome.md", welcome);
