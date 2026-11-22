@@ -176,6 +176,31 @@ class DevTests(BuilderFixture):
         self.wait_for(lambda: not (self.output / "download.bin").exists(), "asset deletion")
         self.assert_no_temporary_directories()
 
+    def test_same_size_edits_within_one_timestamp_second_reload_preview(self):
+        asset = self.content / "same-size.txt"
+        asset.write_text("Edit 0", encoding="utf-8")
+        timestamp = asset.stat().st_mtime_ns // 1_000_000_000 * 1_000_000_000
+        self.start()
+        previous = self.version()
+        for edit in range(1, 4):
+            with self.subTest(edit=edit):
+                body = f"Edit {edit}"
+                # Avoid truncation or a size change, and keep each mtime within
+                # the same second while still giving each save a distinct time.
+                with asset.open("r+b") as stream:
+                    stream.write(body.encode("utf-8"))
+                    stream.flush()
+                    modified = timestamp + edit * 100_000_000
+                    os.utime(asset, ns=(modified, modified))
+                self.assertEqual(asset.stat().st_size, len(body))
+                self.assertEqual(asset.stat().st_mtime_ns // 1_000_000_000,
+                                 timestamp // 1_000_000_000)
+                self.wait_for(lambda: self.http_contains("/same-size.txt", body),
+                              f"same-size edit {edit}")
+                self.wait_for_reload(previous)
+                previous = self.version()
+        self.assert_no_temporary_directories()
+
     def test_taxonomy_metadata_reloads_encoded_routes_and_removes_stale_pages(self):
         self.start("serve", "--base-url", "/blog/", path="/blog/")
         _, response = self.stream(path="/blog/__mizuki/events")
