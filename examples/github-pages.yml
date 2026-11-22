@@ -1,0 +1,44 @@
+# Copy to .github/workflows/pages.yml in a repository containing Mizuki and the site.
+name: Deploy Mizuki to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+      - name: Configure Mizuki
+        run: cmake -S . -B build/pages -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER
+      - name: Build Mizuki
+        run: cmake --build build/pages --parallel 2
+      - name: Build site
+        env:
+          MIZUKI_PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: ./build/pages/bin/mizuki build --base-url "$MIZUKI_PAGES_BASE_URL" --output dist
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - name: Deploy site
+        id: deployment
+        uses: actions/deploy-pages@v5

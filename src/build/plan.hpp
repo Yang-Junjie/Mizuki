@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <map>
 #include <set>
+#include <string>
 #include <vector>
 
 namespace mizuki {
@@ -24,6 +25,7 @@ struct PlannedAsset {
 };
 
 struct BuildPlan {
+    std::string base_path{"/"};
     std::vector<PlannedPage> pages;
     std::vector<PlannedAsset> assets;
     std::map<std::filesystem::path, std::filesystem::path> page_urls;

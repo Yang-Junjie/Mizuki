@@ -40,6 +40,7 @@ void print_usage() {
                  "  --content DIR  Content directory (default: content)\n"
                  "  --theme DIR    Theme directory (default: themes/default)\n"
                  "  --output DIR   Generated site directory (default: dist)\n"
+                 "  --base-url URL Published site URL or path (default: /)\n"
                  "  --port PORT    Preview port for serve (default: 3939)\n"
                  "  --help, -h     Show this help\n";
 }
@@ -92,7 +93,7 @@ ParseResult parse_args(int argc, char** argv, CliOptions& cli) {
 
         bool const is_port = accepts_port && option == "--port";
         if (option != "--content" && option != "--theme" && option != "--output" &&
-            option != "--config" && !is_port) {
+            option != "--config" && option != "--base-url" && !is_port) {
             spdlog::error("Unknown option: {}", option);
             return ParseResult::Error;
         }
@@ -110,6 +111,8 @@ ParseResult parse_args(int argc, char** argv, CliOptions& cli) {
         } else if (option == "--config") {
             cli.config.config_file = value;
             cli.config.explicit_config = true;
+        } else if (option == "--base-url") {
+            cli.config.base_url = value;
         } else if (option == "--content") {
             cli.config.content_dir = std::filesystem::path(value);
         } else if (option == "--theme") {

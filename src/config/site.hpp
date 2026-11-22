@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/url.hpp"
+
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -25,6 +27,7 @@ struct SiteConfig {
     std::filesystem::path output_dir{"dist"};
     std::filesystem::path config_file;
     SiteMetadata site;
+    BaseUrl base_url;
 };
 
 } // namespace mizuki

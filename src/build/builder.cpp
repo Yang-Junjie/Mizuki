@@ -23,13 +23,16 @@ namespace mizuki {
 namespace fs = std::filesystem;
 namespace {
 
-std::vector<TemplateValue> site_values(SiteMetadata const& site, std::string_view navigation) {
+std::vector<TemplateValue> site_values(SiteMetadata const& site, std::string_view navigation,
+                                       std::string_view base_url, std::string_view base_path) {
     return {
         TemplateValue::text("{site_title}", site.title, Requirement::Optional),
         TemplateValue::text("{site_description}", site.description, Requirement::Optional),
         TemplateValue::text("{site_author}", site.author, Requirement::Optional),
         TemplateValue::text("{site_language}", site.language, Requirement::Optional),
         TemplateValue::html("{navigation}", navigation, Requirement::Optional),
+        TemplateValue::text("{base_url}", base_url, Requirement::Optional),
+        TemplateValue::text("{base_path}", base_path, Requirement::Optional),
     };
 }
 
@@ -43,11 +46,13 @@ std::string navigation_for_page(SiteMetadata const& site, fs::path const& page,
 }
 
 std::string render_page(PlannedPage const& page, Template const& layout, SiteMetadata const& site,
-                        BuildPlan const& plan) {
+                        BuildPlan const& plan, BaseUrl const& base) {
     try {
-        auto const html =
-            rewrite_anchor_links(render_markdown(page.document.body), [&](std::string_view url) {
-                return resolve_link(url, page.relative, plan, LinkKind::Document);
+        auto const html = rewrite_document_links(
+            render_markdown(page.document.body), [&](std::string_view url, HtmlLinkKind kind) {
+                return resolve_link(url, page.relative, plan,
+                                    kind == HtmlLinkKind::Anchor ? LinkKind::Document
+                                                                 : LinkKind::Resource);
             });
         auto const asset_base =
             encode_url_path(
@@ -55,7 +60,8 @@ std::string render_page(PlannedPage const& page, Template const& layout, SiteMet
             "/";
         auto const navigation = navigation_for_page(site, page.output, plan);
         auto const& metadata = page.document.metadata;
-        auto values = site_values(site, navigation);
+        auto const base_url = base.origin + base.path;
+        auto values = site_values(site, navigation, base_url, base.path);
         values.push_back(TemplateValue::html("{markdown}", html));
         values.push_back(TemplateValue::text("{asset_base}", asset_base));
         values.push_back(TemplateValue::text("{title}", metadata.title));
@@ -79,7 +85,8 @@ std::string render_homepage(SiteConfig const& config, BuildPlan const& plan) {
     }
     auto const article_list = render_article_list(std::move(articles));
     auto const navigation = navigation_for_page(config.site, "index.html", plan);
-    auto values = site_values(config.site, navigation);
+    auto const base_url = config.base_url.origin + config.base_url.path;
+    auto values = site_values(config.site, navigation, base_url, config.base_url.path);
     values.push_back(TemplateValue::text("{asset_base}", "assets/"));
     values.push_back(TemplateValue::html("{posts}", article_list));
     return Template(config.theme_dir / "layouts/home.html").render(values);
@@ -101,7 +108,7 @@ BuildStats build_site(SiteConfig const& config) {
         }
         auto const destination = output.stage() / page.output;
         fs::create_directories(destination.parent_path());
-        write_file(destination, render_page(page, *layout, config.site, plan));
+        write_file(destination, render_page(page, *layout, config.site, plan, config.base_url));
     }
     write_file(output.stage() / "index.html", render_homepage(config, plan));
     for (auto const& asset : plan.assets) {

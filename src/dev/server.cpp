@@ -16,12 +16,13 @@ int serve(ConfigRequest const& request, int port) {
     WatchSession session(request);
     session.build_if_changed();
 
-    auto const output_dir = session.preview_config().output_dir;
+    auto const& initial = session.preview_config();
+    auto const output_dir = initial.output_dir;
     if (!std::filesystem::is_directory(output_dir)) {
         spdlog::error("Failed to serve directory: {}", path_to_utf8(output_dir));
         return 1;
     }
-    LiveReload reload(output_dir);
+    LiveReload reload(output_dir, initial.base_url.path);
     httplib::Server server;
     server.set_default_headers({{"Cache-Control", "no-store"}});
     attach_preview(server, reload);
@@ -38,11 +39,13 @@ int serve(ConfigRequest const& request, int port) {
         return 1;
     }
 
-    spdlog::info("Serving {} at http://127.0.0.1:{}. Press Ctrl+C to stop.",
-                 path_to_utf8(output_dir), port);
+    spdlog::info("Serving {} at http://127.0.0.1:{}{}. Press Ctrl+C to stop.",
+                 path_to_utf8(output_dir), port, initial.base_url.path);
     std::jthread rebuild([&](std::stop_token stop) {
-        session.run(
-            stop, [&reload](SiteConfig const& config) { reload.notify_build(config.output_dir); });
+        session.run(stop, [&reload, port](SiteConfig const& config) {
+            reload.notify_build(config.output_dir, config.base_url.path);
+            spdlog::info("Preview: http://127.0.0.1:{}{}", port, config.base_url.path);
+        });
     });
     if (!server.listen_after_bind()) {
         spdlog::error("HTTP server failed on 127.0.0.1:{}", port);

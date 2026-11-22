@@ -42,6 +42,7 @@ title = "Mizuki"
 description = "一个用 C++ 编写的轻量博客框架"
 author = ""
 language = "zh-CN"
+base_url = "/"
 content = "content"
 theme = "themes/default"
 output = "dist"
@@ -55,7 +56,7 @@ title = "关于"
 url = "/pages/about.md"
 ```
 
-支持的顶层键只有以上八项。除 `navigation` 外均为字符串；`description` 和 `author` 允许为空，其余不能为空或全是空白。导航项只能包含非空字符串 `title` 和 `url`。省略导航时默认只有首页，`navigation = []` 隐藏导航。未知键、类型错误、重复键或 TOML 语法错误都会报错，并给出配置文件位置。
+支持的顶层键只有以上九项。除 `navigation` 外均为字符串；`description` 和 `author` 允许为空，其余不能为空或全是空白。导航项只能包含非空字符串 `title` 和 `url`。省略导航时默认只有首页，`navigation = []` 隐藏导航。未知键、类型错误、重复键或 TOML 语法错误都会报错，并给出配置文件位置。
 
 所有命令支持指定配置及目录：
 
@@ -63,6 +64,7 @@ url = "/pages/about.md"
 ./build/bin/mizuki build --config sites/blog.toml
 ./build/bin/mizuki serve --config sites/blog.toml --output preview
 ./build/bin/mizuki watch --content content --theme themes/default --output dist
+./build/bin/mizuki build --base-url https://example.com/blog/
 ```
 
 优先级为 **命令行 > 配置文件 > 内置默认值**，参数先后顺序不影响优先级。配置文件中的相对目录，以及已存在配置文件中省略的目录默认值，都以配置文件所在目录为基准；命令行相对路径和 `--config` 路径以当前工作目录为基准。显式指定的 `--config` 文件不存在时会报错。
@@ -72,6 +74,32 @@ url = "/pages/about.md"
 运行中的配置错误或构建失败会打印诊断，保留最近一次成功的输出和预览，并继续监听以便修复；构建成功才通知浏览器刷新。新输入目录有效、但其中内容导致构建失败时，仍会监听这些新目录，修正文稿即可恢复。启动时配置无效或无法建立监听则退出；首次 `serve` 构建失败且没有已有输出时也会退出。
 
 默认配置被删除时恢复内置默认值并保留命令行覆盖；显式 `--config` 文件被删除则报错并等待它重新创建。切换输出目录不会主动删除旧输出目录。
+
+## 部署地址与子路径
+
+`base_url` 默认为 `/`，支持以 `/` 开始的站点路径，或包含域名的 HTTP(S) 地址。缺少结尾 `/` 时会自动补齐，路径中的中文、空格和百分号按 URL 编码规范化。例如：
+
+```toml
+base_url = "https://example.com/blog/"
+```
+
+部署到域名根目录时使用 `https://example.com/`；本地只需要模拟子路径时可以使用 `/blog/`。地址不允许用户名、密码、query、fragment、`.` / `..` 路径段、连续 `/`、控制字符或无效百分号编码；端口范围为 1–65535。域名使用 ASCII 或 Punycode，可使用方括号包裹的 IPv6 地址。`--base-url` 在 `build`、`watch`、`serve` 中均可覆盖配置，并在配置热重载后保留优先级。
+
+内容和导航中的根路径始终从**站点根目录**解析，书写时不包含部署前缀。例如部署到 `/blog/` 时：
+
+| 内容 | 生成结果 |
+| --- | --- |
+| 正文 `[关于](/pages/about.md)` | `href="/blog/pages/about.html"` |
+| 正文 `[下载](/download.zip)` | `href="/blog/download.zip"` |
+| 正文 `![图片](/images/photo.png)` | `src="/blog/images/photo.png"` |
+| 正文 `[关于](../pages/about.md)` | `href="../pages/about.html"` |
+| 默认主题样式、导航、首页文章列表 | 保持相对链接 |
+
+query 和 fragment 保留；外部地址、`//` 地址、纯锚点保持原样。`base_url` 中的域名不会强行加入普通站内链接。输出文件仍直接位于 `dist/`，不会额外创建 `dist/blog/`；部署时将输出目录的内容挂载到 `/blog/`。
+
+`serve` 使用相同的部署路径。例如运行 `mizuki serve --base-url /blog/` 后访问 `http://127.0.0.1:3939/blog/`；`/blog` 会重定向到 `/blog/`，前缀之外的地址返回 404。静态文件与自动刷新 SSE 均使用该前缀。修改 `base_url` 后，构建成功才切换预览路径，并通知已打开的页面转到新路径，保留页面路径、query 和 fragment；构建失败时保留旧输出、旧预览路径和刷新版本。
+
+完整的 GitHub Pages 配置和工作流示例见 [部署指南](docs/deployment.md)。
 
 ## 内容与独立页面
 
@@ -115,7 +143,11 @@ Markdown 文内的本地 `.md` 链接会改写为目标 `.html`，支持相对�
 
 在 `posts/hello.md` 中，前一条输出为 `../pages/about.html?from=article#intro`。链接解析使用实际发布页面清单，路径及大小写应与源文件一致。目标缺失、指向草稿或越出内容目录会报错，避免发布失效的 Markdown 链接。根 `/index.md` 固定指向生成的首页。
 
-改写仅作用于真实链接的 `href`，包括原始 HTML 的 `<a href="...md">`；普通文字、代码、图片的 `src`、HTML 注释和 script/style/textarea/title 内容不改写。外部链接、纯锚点和普通非 Markdown 资源链接保持原样。不会验证 fragment 对应的锚点，也不会自动为标题生成 ID。
+`.md` 到 `.html` 的改写仅作用于真实链接的 `href`，包括正文中原始 HTML 的 `<a href="...md">`。图片和其他资源中的 `.md` 不转换为页面链接。
+
+正文的根路径资源也会带上部署前缀：包括 `img`、`source`、`script`、`audio`、`video`、`iframe`、`input`、`track`、`embed` 的 `src`，`link` 的 `href`、`video` 的 `poster` 和 `object` 的 `data`。相对资源路径保持原样。普通文字、代码、HTML 注释和 script/style/textarea/title 的文本内容不改写。不会验证 fragment 对应的锚点，也不会自动为标题生成 ID。
+
+URL 改写只处理 Markdown 渲染出的正文。原样复制的 HTML、CSS、模板中写死的地址和 `srcset` 不自动改写：模板使用 `{asset_base}` 或 `{base_path}`，CSS 的 `url(...)` 相对样式文件书写，`srcset` 相对当前页面书写。
 
 ## 主题模板
 
@@ -127,7 +159,7 @@ Markdown 文内的本地 `.md` 链接会改写为目标 `.html`，支持相对�
 
 `{asset_base}` 是相对当前页面的主题资源目录，包含结尾 `/`；`{posts}` 是已发布文章的 HTML 列表。文章和独立页面都可使用 `{date}`，独立页面省略日期时替换为空字符串。
 
-所有模板还可选用 `{site_title}`、`{site_description}`、`{site_author}`、`{site_language}` 和 `{navigation}`。新占位符均可省略，现有主题仍可使用。文本和属性值会转义 HTML；正文、文章列表和导航作为 HTML 插入。替换值中的占位符不会再次替换。
+所有模板还可选用 `{site_title}`、`{site_description}`、`{site_author}`、`{site_language}`、`{navigation}`、`{base_url}` 和 `{base_path}`。`{base_url}` 是规范化后的完整配置地址，`{base_path}` 是规范化后的部署路径，两者都包含结尾 `/`。新占位符均可省略，现有主题仍可使用。文本和属性值会转义 HTML；正文、文章列表和导航作为 HTML 插入。替换值中的占位符不会再次替换。
 
 主题 `assets/` 中的文件复制到输出 `assets/`，内容目录的非 Markdown 文件按相对路径复制。
 
@@ -162,6 +194,6 @@ cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
 
-测试均使用临时目录，包括构建与输出事务、冲突诊断和旧输出保护、Markdown 链接、TOML 校验及优先级、独立页面和导航，以及真实 `watch` / `serve` 进程的文件变化、配置热重载、监听目录切换、HTTP 和 SSE。测试进程退出时会清理临时文件及子进程。
+测试均使用临时目录，包括构建与输出事务、冲突诊断和旧输出保护、Markdown 链接、TOML 校验及优先级、根目录与子目录部署、独立页面和导航，以及真实 `watch` / `serve` 进程的文件变化、配置热重载、监听目录切换、HTTP、SSE 及部署路径切换。测试进程退出时会清理临时文件及子进程。
 
 代码分层、接口约定、格式化和单独运行测试的方法见 [开发约定](CONTRIBUTING.md)。

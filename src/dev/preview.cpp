@@ -42,18 +42,25 @@ std::optional<fs::path> resolve_request_path(fs::path const& root, std::string_v
     return path;
 }
 
-std::string inject_reload_script(std::string html, std::size_t version) {
+std::string inject_reload_script(std::string html, std::string_view local_path,
+                                 PreviewSnapshot const& snapshot) {
     std::string script = R"(
 <script>
 (() => {
     const version = ")";
-    script += std::to_string(version);
+    script += std::to_string(snapshot.version);
     script += R"(";
-    const events = new EventSource("/__mizuki/events");
+    const page = ")";
+    script += encode_url_path(local_path.substr(1));
+    script += R"(";
+    const events = new EventSource(")";
+    script += snapshot.base_path + "__mizuki/events";
+    script += R"(");
     events.onmessage = (event) => {
-        if (event.data !== version) {
+        const published = JSON.parse(event.data);
+        if (String(published.version) !== version) {
             events.close();
-            location.reload();
+            location.replace(published.base_path + page + location.search + location.hash);
         }
     };
 })();
@@ -64,15 +71,18 @@ std::string inject_reload_script(std::string html, std::size_t version) {
     return html;
 }
 
-void serve_file(httplib::Request const& request, httplib::Response& response,
-                PreviewSnapshot const& snapshot) {
+void serve_file(httplib::Request const& request, std::string_view local_path,
+                httplib::Response& response, PreviewSnapshot const& snapshot) {
     response.status = 404;
-    auto const path = resolve_request_path(snapshot.output_dir, request.path);
+    auto const path = resolve_request_path(snapshot.output_dir, local_path);
     if (!path) {
         return;
     }
     if (fs::is_directory(*path)) {
-        response.set_redirect(encode_url_path(request.path) + "/", 301);
+        auto const query = request.target.find('?');
+        response.set_redirect(encode_url_path(request.path) + "/" +
+                                  (query == std::string::npos ? "" : request.target.substr(query)),
+                              301);
         return;
     }
     if (!fs::is_regular_file(*path)) {
@@ -83,7 +93,7 @@ void serve_file(httplib::Request const& request, httplib::Response& response,
                            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
     response.status = 200;
     if (extension == ".html" || extension == ".htm") {
-        response.set_content(inject_reload_script(read_file(*path), snapshot.version),
+        response.set_content(inject_reload_script(read_file(*path), local_path, snapshot),
                              "text/html; charset=utf-8");
     } else {
         response.set_file_content(path_to_utf8(*path));
@@ -98,13 +108,28 @@ void attach_preview(httplib::Server& server, LiveReload& reload) {
             if (request.method != "GET" && request.method != "HEAD") {
                 return httplib::Server::HandlerResponse::Unhandled;
             }
-            if (request.path == "/__mizuki/events" && request.method == "GET") {
-                reload.stream_events(response);
+            auto const snapshot = reload.snapshot();
+            auto const mount = decode_url_path(snapshot.base_path);
+            auto const query = request.target.find('?');
+            if (mount != "/" && request.path == mount.substr(0, mount.size() - 1)) {
+                response.set_redirect(snapshot.base_path + (query == std::string::npos
+                                                                ? ""
+                                                                : request.target.substr(query)),
+                                      301);
+            } else if (!request.path.starts_with(mount)) {
+                response.status = 404;
             } else {
-                try {
-                    serve_file(request, response, reload.snapshot());
-                } catch (std::exception const&) {
+                auto const local_path = "/" + request.path.substr(mount.size());
+                if (local_path.starts_with("//")) {
                     response.status = 404;
+                } else if (local_path == "/__mizuki/events" && request.method == "GET") {
+                    reload.stream_events(response);
+                } else {
+                    try {
+                        serve_file(request, local_path, response, snapshot);
+                    } catch (std::exception const&) {
+                        response.status = 404;
+                    }
                 }
             }
             return httplib::Server::HandlerResponse::Handled;

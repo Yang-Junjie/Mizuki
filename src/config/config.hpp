@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <string>
 
 namespace mizuki {
 
@@ -14,6 +15,7 @@ struct ConfigRequest {
     std::optional<std::filesystem::path> content_dir;
     std::optional<std::filesystem::path> theme_dir;
     std::optional<std::filesystem::path> output_dir;
+    std::optional<std::string> base_url;
 };
 
 SiteConfig load_config(ConfigRequest const& request);

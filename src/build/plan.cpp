@@ -74,6 +74,7 @@ std::vector<fs::path> regular_files(fs::path const& directory) {
 
 BuildPlan plan_build(SiteConfig const& options) {
     BuildPlan plan;
+    plan.base_path = options.base_url.path;
     OutputRegistry registry(options);
     auto reserve = [&](fs::path const& path, std::string const& source) {
         registry.add(path, source);

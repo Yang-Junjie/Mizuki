@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <mutex>
+#include <string>
 
 namespace httplib {
 struct Response;
@@ -13,22 +14,22 @@ namespace mizuki {
 
 struct PreviewSnapshot {
     std::filesystem::path output_dir;
+    std::string base_path;
     std::size_t version;
 };
 
 class LiveReload {
 public:
-    explicit LiveReload(std::filesystem::path const& output_dir);
+    LiveReload(std::filesystem::path const& output_dir, std::string base_path);
 
     PreviewSnapshot snapshot() const;
-    void notify_build(std::filesystem::path const& output_dir);
+    void notify_build(std::filesystem::path const& output_dir, std::string base_path);
     void stream_events(httplib::Response& response);
 
 private:
     mutable std::mutex mutex_;
     std::condition_variable changed_;
-    std::filesystem::path output_dir_;
-    std::size_t version_{0};
+    PreviewSnapshot published_;
 };
 
 } // namespace mizuki

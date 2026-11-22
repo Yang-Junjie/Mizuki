@@ -40,7 +40,14 @@ std::string resolve_link(std::string_view url, fs::path const& source, BuildPlan
         return std::string(url);
     }
     auto decoded = decode_url_path(raw_path);
+    if (decoded.starts_with("//")) {
+        throw std::runtime_error("Ambiguous local URL in " + path_to_utf8(source) + ": " +
+                                 std::string(url));
+    }
     bool const rooted = decoded.starts_with('/');
+    if (kind == LinkKind::Resource && !rooted) {
+        return std::string(url);
+    }
     auto path = path_from_utf8(decoded);
     if (rooted) {
         path = path.relative_path();
@@ -53,7 +60,7 @@ std::string resolve_link(std::string_view url, fs::path const& source, BuildPlan
         throw std::runtime_error("Local link escapes content directory in " + path_to_utf8(source) +
                                  ": " + std::string(url));
     }
-    bool const markdown = is_markdown(path);
+    bool const markdown = kind != LinkKind::Resource && is_markdown(path);
     if (markdown) {
         auto const found = plan.page_urls.find(path);
         if (found == plan.page_urls.end()) {
@@ -70,14 +77,15 @@ std::string resolve_link(std::string_view url, fs::path const& source, BuildPlan
             throw std::runtime_error("Navigation target does not exist: " + std::string(url));
         }
     } else {
-        return std::string(url);
+        return rooted ? plan.base_path + encode_url_path(path_to_utf8(path)) + std::string(suffix)
+                      : std::string(url);
     }
     if (navigation || !rooted) {
         path = path.lexically_relative(source.parent_path());
     }
     auto result = encode_url_path(path_to_utf8(path));
     if (rooted && !navigation) {
-        result.insert(0, "/");
+        result.insert(0, plan.base_path);
     }
     // A colon in the first component must never turn a relative link into a scheme.
     if (!rooted && result.find(':') < result.find('/')) {

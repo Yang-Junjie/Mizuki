@@ -4,6 +4,7 @@
 
 #include <cctype>
 #include <charconv>
+#include <optional>
 
 namespace mizuki {
 namespace {
@@ -99,8 +100,25 @@ std::size_t tag_end(std::string_view html, std::size_t start) {
     return std::string_view::npos;
 }
 
-std::string rewrite_anchor(std::string_view tag, std::size_t name_end,
-                           LinkRewriter const& rewrite) {
+std::optional<HtmlLinkKind> attribute_kind(std::string_view element, std::string_view attribute) {
+    if ((element == "a" || element == "area") && attribute == "href") {
+        return HtmlLinkKind::Anchor;
+    }
+    if ((attribute == "href" && element == "link") ||
+        (attribute == "poster" && element == "video") ||
+        (attribute == "data" && element == "object") ||
+        (attribute == "src" && (element == "img" || element == "source" || element == "script" ||
+                                element == "audio" || element == "video" || element == "iframe" ||
+                                element == "input" || element == "track" || element == "embed"))) {
+        return HtmlLinkKind::Resource;
+    }
+    return std::nullopt;
+}
+
+std::string rewrite_tag(std::string_view tag, std::size_t name_end, std::string_view element,
+                        LinkRewriter const& rewrite) {
+    std::string result;
+    std::size_t copied = 0;
     auto i = name_end;
     while (i < tag.size()) {
         while (i < tag.size() && space(tag[i])) {
@@ -137,25 +155,28 @@ std::string rewrite_anchor(std::string_view tag, std::size_t name_end,
         if (quote && i < tag.size()) {
             ++i;
         }
-        if (name != "href") {
+        auto const kind = attribute_kind(element, name);
+        if (!kind) {
             continue;
         }
         auto const old = decode_attribute(tag.substr(start, end - start));
-        auto const rewritten = rewrite(old);
+        auto const rewritten = rewrite(old, *kind);
         if (rewritten == old) {
-            return std::string(tag);
+            continue;
         }
         auto const attribute_start = quote ? start - 1 : start;
         auto const attribute_end = quote && end < tag.size() ? end + 1 : end;
-        return std::string(tag.substr(0, attribute_start)) + "\"" + escape_html(rewritten) + "\"" +
-               std::string(tag.substr(attribute_end));
+        result += tag.substr(copied, attribute_start - copied);
+        result += "\"" + escape_html(rewritten) + "\"";
+        copied = attribute_end;
     }
-    return std::string(tag);
+    result += tag.substr(copied);
+    return result;
 }
 
 } // namespace
 
-std::string rewrite_anchor_links(std::string_view html, LinkRewriter const& rewrite) {
+std::string rewrite_document_links(std::string_view html, LinkRewriter const& rewrite) {
     std::string result;
     std::string raw_element;
     auto const folded = lower(html);
@@ -204,7 +225,7 @@ std::string rewrite_anchor_links(std::string_view html, LinkRewriter const& rewr
         }
         auto const name = lower(html.substr(start + 1, name_end - start - 1));
         auto const tag = html.substr(start, end - start + 1);
-        result += name == "a" ? rewrite_anchor(tag, name_end - start, rewrite) : std::string(tag);
+        result += rewrite_tag(tag, name_end - start, name, rewrite);
         if (name == "script" || name == "style" || name == "textarea" || name == "title") {
             raw_element = name;
         }

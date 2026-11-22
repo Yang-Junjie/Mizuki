@@ -1,8 +1,9 @@
 """Regressions for output planning, links, TOML configuration and independent pages."""
 
 from html.parser import HTMLParser
+import json
 import subprocess
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urljoin, urlsplit
 
 from support import BuilderFixture, run_tests
 
@@ -16,6 +17,16 @@ class Anchors(HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag == "a":
             self.hrefs.extend(value for key, value in attrs if key == "href")
+
+
+class UrlAttributes(HTMLParser):
+    def __init__(self, source):
+        super().__init__()
+        self.urls = []
+        self.feed(source)
+
+    def handle_starttag(self, tag, attrs):
+        self.urls.extend(value for key, value in attrs if key in ("href", "src", "poster", "data"))
 
 
 class SiteTests(BuilderFixture):
@@ -164,7 +175,7 @@ class SiteTests(BuilderFixture):
         self.build()
         before = self.snapshot()
         self.write_page("posts/draft.md", "Hidden", "Draft", draft=True)
-        for target in ("missing.md", "draft.md", "../../../outside.md"):
+        for target in ("missing.md", "draft.md", "../../../outside.md", "%2F%2Fevil.example/file.bin"):
             with self.subTest(target=target):
                 self.write_page("posts/first.md", "Broken link", f"[broken]({target})")
                 message = self.build(success=False)
@@ -308,6 +319,135 @@ url = "https://example.com/path?q=1&x=2"
             self.assertIn(home_url, hrefs)
             self.assertIn(about_url, hrefs)
             self.assertIn("https://example.com/path?q=1&x=2", hrefs)
+
+    def test_base_url_relocates_document_links_and_resources(self):
+        self.independent()
+        body = '''[about](/pages/about.md?q=1&x=2#heading)
+[home](/index.md)
+[download](/download.bin?q=1&x=2#part)
+[encoded root](%2Fdownload.bin)
+[encoded page](%2Fpages/about.md)
+[relative](../download.bin)
+[external](https://example.net/pages/about.md)
+[protocol relative](//example.net/pages/about.md)
+![root image](/images/photo.png?q=1&x=2)
+![relative image](../images/photo.png)
+![encoded image](%2Fencoded-image.png)
+![markdown resource](/image.md)
+![external image](//example.net/image.png)
+<video src='/movie.mp4' poster=/images/photo.png></video>
+<script src="/script.js">const unchanged = '<img src="/literal.png">';</script>
+<link href="/style.css" rel="stylesheet">
+<a HREF=/pages/about.md>Raw link</a>
+<img SRC='/images/中文%20photo.png' data-caption='/literal.png'>
+<!-- <img src="/comment.png"> -->
+`<img src="/code.png">`
+'''
+        self.write_page("posts/first.md", "Deployment", body)
+        for base_url, prefix in (
+            ("/", "/"), ("/blog", "/blog/"),
+            ("https://example.com/blog/", "/blog/"),
+            ("/中文 space/%25路径", quote("/中文 space/%路径/", safe="/")),
+        ):
+            with self.subTest(base_url=base_url):
+                self.config(f"base_url = {json.dumps(base_url)}\n")
+                self.build()
+                rendered = self.read("posts/first.html")
+                urls = UrlAttributes(rendered).urls
+                for target in (
+                    "pages/about.html?q=1&x=2#heading", "index.html", "download.bin?q=1&x=2#part",
+                    "images/photo.png?q=1&x=2", "image.md", "movie.mp4", "images/photo.png",
+                    "script.js", "style.css", "pages/about.html", quote("images/中文 photo.png", safe="/"),
+                    "download.bin", "encoded-image.png",
+                ):
+                    self.assertIn(prefix + target, urls)
+                for untouched in (
+                    "../download.bin", "../images/photo.png", "//example.net/image.png",
+                    "https://example.net/pages/about.md", "//example.net/pages/about.md",
+                    "../assets/css/style.css", "../index.html",
+                ):
+                    self.assertIn(untouched, urls)
+                self.assertIn('<img src="/literal.png">', rendered)
+                self.assertIn('<!-- <img src="/comment.png"> -->', rendered)
+                self.assertIn("data-caption='/literal.png'", rendered)
+                self.assertNotIn("&amp;amp;", rendered)
+                self.assert_no_temporary_directories()
+
+    def test_all_generated_site_links_resolve_inside_root_and_subpath_mounts(self):
+        self.independent()
+        self.write_page("notes/deep/article.md", "Deep", "[About](/pages/about.md)\n![Photo](/images/中文%20photo.png)")
+        image = self.content / "images/中文 photo.png"
+        image.parent.mkdir()
+        image.write_bytes(b"image")
+        for prefix in ("/", "/blog/", quote("/中文 space/", safe="/")):
+            with self.subTest(prefix=prefix):
+                self.config(f'base_url = "https://example.com{prefix}"\n')
+                self.build()
+                for page in ("index.html", "posts/first.html", "pages/about.html", "notes/deep/article.html"):
+                    for url in UrlAttributes(self.read(page)).urls:
+                        resolved = urlsplit(urljoin("https://example.com" + prefix + page, url))
+                        self.assertEqual(resolved.netloc, "example.com")
+                        self.assertTrue(resolved.path.startswith(prefix), (page, url))
+                        target = unquote(resolved.path[len(prefix):])
+                        self.assertTrue((self.output / target).is_file(), (page, url, target))
+                self.assertFalse((self.output / "blog").exists())
+
+    def test_base_url_template_values_are_normalized_and_optional(self):
+        for layout in ("home.html", "post.html", "page.html"):
+            path = self.theme / "layouts" / layout
+            path.write_text(path.read_text(encoding="utf-8") +
+                            '<a href="{base_path}download.bin">Download</a><p>{base_url}</p>', encoding="utf-8")
+        self.independent()
+        for base_url, expected_url, prefix in (
+            ("https://example.com", "https://example.com/", "/"),
+            ("HTTP://localhost:8080/blog", "http://localhost:8080/blog/", "/blog/"),
+            ("https://[::1]:8080/blog/", "https://[::1]:8080/blog/", "/blog/"),
+            ("https://[::ffff:127.0.0.1]/blog/", "https://[::ffff:127.0.0.1]/blog/", "/blog/"),
+            ("/中文%20space", quote("/中文 space/", safe="/"), quote("/中文 space/", safe="/")),
+        ):
+            with self.subTest(base_url=base_url):
+                self.config(f"base_url = {json.dumps(base_url)}\n")
+                self.build()
+                for page in ("index.html", "posts/first.html", "pages/about.html"):
+                    self.assertIn(f"<p>{expected_url}</p>", self.read(page))
+                    self.assertIn(prefix + "download.bin", UrlAttributes(self.read(page)).urls)
+
+    def test_invalid_base_urls_preserve_successful_output(self):
+        self.build()
+        before = self.snapshot()
+        invalid = (
+            "", "blog/", "//example.com/blog/", "ftp://example.com/", "https:///blog/",
+            "https://user:pass@example.com/blog/", "https://example.com:0/blog/",
+            "https://example.com:65536/", "https://example.com:/", "https://example.com:abc/",
+            "https://[:::]/", "https://[1::2::3]/", "https://[1:2:3]/", "https://[::ffff:300.0.0.1]/",
+            "https://example.com/?q=1", "/blog/#section", "/blog/../other/", "/./blog/",
+            "/%2e%2e/", "/blog//nested/", "/blog%00/", "/blog%0A/", "/blog%5c/",
+            "/blog\\other/", "/blog%2/", "/blog%XX/", "/blog\n/", "/C:/blog/",
+        )
+        for base_url in invalid:
+            with self.subTest(base_url=base_url):
+                self.config(f"base_url = {json.dumps(base_url)}\n")
+                message = self.build(success=False)
+                self.assertIn("mizuki.toml", message)
+                self.assertIn("base_url", message)
+                self.assertEqual(self.snapshot(), before)
+                self.assert_no_temporary_directories()
+        self.config("base_url = 42\n")
+        self.assertIn("base_url", self.build(success=False))
+        self.assertEqual(self.snapshot(), before)
+
+    def test_cli_base_url_override_has_precedence_in_either_flag_order(self):
+        self.write_page("posts/first.md", "Override", "[Home](/index.md)")
+        config = self.config('base_url = "https://example.com/configured/"\n')
+        overrides = ("--content", self.content, "--theme", self.theme, "--output", self.output,
+                     "--base-url", "/preview")
+        for args in ((*overrides, "--config", config), ("--config", config, *overrides)):
+            self.command(*args)
+            self.assertIn("/preview/index.html", Anchors(self.read("posts/first.html")).hrefs)
+        before = self.snapshot()
+        self.assertIn("base_url", self.command(*overrides[:-1], "relative/", success=False))
+        self.assertEqual(self.snapshot(), before)
+        self.assertIn("Missing value", self.command("--base-url", success=False))
 
     def test_empty_navigation_removes_nav(self):
         self.config("navigation = []")

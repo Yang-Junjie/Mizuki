@@ -2,6 +2,7 @@
 
 from http.client import HTTPConnection
 from pathlib import Path
+import json
 import re
 import shutil
 import socket
@@ -24,7 +25,7 @@ class DevTests(BuilderFixture):
     def logs(self):
         return self.log_path.read_text(encoding="utf-8", errors="replace")
 
-    def start(self, command="serve", *args, configure=True):
+    def start(self, command="serve", *args, configure=True, path="/"):
         if configure:
             self.configure()
         with socket.socket() as probe:
@@ -40,7 +41,7 @@ class DevTests(BuilderFixture):
         self.addCleanup(self.stop)
         self.wait_for(lambda: (self.output / "index.html").is_file(), "initial build")
         if command == "serve":
-            self.wait_for(lambda: self.request("/")[0] == 200, "HTTP listener")
+            self.wait_for(lambda: self.request(path)[0] == 200, "HTTP listener")
 
     def stop(self):
         if self.process.poll() is None:
@@ -81,9 +82,9 @@ class DevTests(BuilderFixture):
         status, _, body = self.request(path)
         return status == 200 and text.encode("utf-8") in body
 
-    def stream(self, timeout=3):
+    def stream(self, timeout=3, path="/__mizuki/events"):
         connection = HTTPConnection("127.0.0.1", self.port, timeout=timeout)
-        connection.request("GET", "/__mizuki/events")
+        connection.request("GET", path)
         response = connection.getresponse()
         self.assertEqual(response.status, 200)
         self.assertEqual(response.getheader("Content-Type"), "text/event-stream")
@@ -91,15 +92,18 @@ class DevTests(BuilderFixture):
         self.addCleanup(response.close)
         return connection, response
 
-    def event(self, response):
+    def message(self, response):
         while True:
             line = response.readline()
             self.assertTrue(line, "SSE connection closed unexpectedly")
             if line.startswith(b"data: "):
-                return int(line[6:])
+                return json.loads(line[6:])
 
-    def version(self):
-        status, _, body = self.request("/")
+    def event(self, response):
+        return self.message(response)["version"]
+
+    def version(self, path="/"):
+        status, _, body = self.request(path)
         self.assertEqual(status, 200)
         return int(re.search(rb'const version = "(\d+)"', body)[1])
 
@@ -226,6 +230,86 @@ class DevTests(BuilderFixture):
         self.wait_for(lambda: self.http_contains("/posts/first.html", "New watcher works."), "new content watcher")
         self.assertIn("Initial site", (self.output / "index.html").read_text(encoding="utf-8"))
         self.assert_no_temporary_directories(next_output)
+
+    def test_subpath_preview_scopes_files_redirects_and_reload_events(self):
+        self.configure('theme = "theme"\nbase_url = "https://example.com/blog"\n')
+        (self.content / "binary.bin").write_bytes(b"binary")
+        (self.content / "中文 space.txt").write_text("Resource", encoding="utf-8")
+        folder = self.content / "folder"
+        folder.mkdir()
+        (folder / "index.html").write_text("<body>Folder</body>", encoding="utf-8")
+        self.start(configure=False, path="/blog/")
+        self.assertIn(f"http://127.0.0.1:{self.port}/blog/", self.logs())
+        status, _, html = self.request("/blog/posts/first.html")
+        self.assertEqual(status, 200)
+        self.assertIn(b'new EventSource("/blog/__mizuki/events")', html)
+        self.assertNotIn("EventSource", (self.output / "posts/first.html").read_text(encoding="utf-8"))
+        for path in ("/", "/posts/first.html", "/assets/css/style.css", "/blogger/", "/__mizuki/events", "/blog//binary.bin"):
+            self.assertEqual(self.request(path)[0], 404, path)
+        for path in ("/blog/../mizuki.toml", "/blog/%2e%2e/mizuki.toml", "/blog/%5c..%5cmizuki.toml"):
+            self.assertIn(self.request(path)[0], (400, 404), path)
+        for path in ("/blog", "/blog/folder"):
+            status, headers, _ = self.request(path + "?q=1&x=2")
+            self.assertEqual(status, 301)
+            self.assertEqual(headers["Location"], path + "/?q=1&x=2")
+        self.assertEqual(self.request("/blog/binary.bin")[2], b"binary")
+        self.assertEqual(self.request("/blog/%E4%B8%AD%E6%96%87%20space.txt")[2], b"Resource")
+        self.assertTrue(self.http_contains("/blog/folder/", "Folder"))
+        self.assertEqual(self.request("/blog/assets/css/style.css")[2],
+                         (self.theme / "assets/css/style.css").read_bytes())
+        self.assertEqual(self.request("/blog/", "HEAD")[0::2], (200, b""))
+        _, response = self.stream(path="/blog/__mizuki/events")
+        initial = self.message(response)
+        self.assertEqual(initial["base_path"], "/blog/")
+        self.write_page("posts/first.md", "Changed", "Subpath update.")
+        self.wait_for(lambda: self.http_contains("/blog/posts/first.html", "Subpath update."), "subpath rebuild")
+        updated = self.message(response)
+        self.assertGreater(updated["version"], initial["version"])
+        self.assertEqual(updated["base_path"], "/blog/")
+
+    def test_base_url_hot_reload_switches_mount_and_output_only_after_success(self):
+        self.configure('theme = "theme"\nbase_url = "/old/"\n')
+        self.start(configure=False, path="/old/")
+        _, response = self.stream(path="/old/__mizuki/events")
+        initial = self.message(response)
+        before = self.snapshot()
+        self.configure('theme = "theme"\nbase_url = "/invalid/?query"\n')
+        self.wait_for(lambda: "base_url" in self.logs(), "invalid base URL diagnostic")
+        self.assertEqual(self.version("/old/"), initial["version"])
+        (self.content / "posts/first.md").write_text("Broken source.", encoding="utf-8")
+        self.configure('theme = "theme"\nbase_url = "/new/"\noutput = "next-dist"\n')
+        self.wait_for(lambda: "Failed to parse" in self.logs(), "failed mount switch")
+        self.assertEqual(self.snapshot(), before)
+        self.assertTrue(self.http_contains("/old/posts/first.html", "Original body."))
+        self.assertEqual(self.version("/old/"), initial["version"])
+        self.assertEqual(self.request("/new/")[0], 404)
+        self.assertFalse((self.root / "next-dist").exists())
+        self.write_page("posts/first.md", "Recovered", "[Home](/index.md)")
+        self.wait_for(lambda: self.http_contains("/new/posts/first.html", "/new/index.html"), "successful mount switch")
+        published = self.message(response)
+        self.assertGreater(published["version"], initial["version"])
+        self.assertEqual(published["base_path"], "/new/")
+        self.assertEqual(self.request("/old/")[0], 404)
+        self.assertEqual(self.request("/old/__mizuki/events")[0], 404)
+        _, current = self.stream(path="/new/__mizuki/events")
+        self.assertEqual(self.message(current), published)
+        self.assertEqual(self.snapshot(), before)
+        self.assert_no_temporary_directories(self.root / "next-dist")
+
+    def test_encoded_base_path_and_cli_override_survive_config_reload(self):
+        prefix = "/%E4%B8%AD%E6%96%87%20space/"
+        self.start("serve", "--base-url", prefix, path=prefix)
+        self.assertEqual(self.request("/")[0], 404)
+        self.assertTrue(self.http_contains(prefix + "posts/first.html", "Original body."))
+        _, response = self.stream(path=prefix + "__mizuki/events")
+        initial = self.message(response)
+        self.assertEqual(initial["base_path"], prefix)
+        self.configure('theme = "theme"\nbase_url = "/ignored/"\ntitle = "Reloaded URL override"\n', atomic=True)
+        self.wait_for(lambda: self.http_contains(prefix, "Reloaded URL override"), "base URL CLI precedence")
+        updated = self.message(response)
+        self.assertGreater(updated["version"], initial["version"])
+        self.assertEqual(updated["base_path"], prefix)
+        self.assertEqual(self.request("/ignored/")[0], 404)
 
     def test_initial_failed_build_serves_previous_output_and_recovers(self):
         self.build()

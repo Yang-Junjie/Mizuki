@@ -76,7 +76,8 @@ std::vector<NavigationItem> parse_navigation(toml::node const& node) {
 void read_config_file(SiteConfig& config) {
     auto const table = toml::parse(read_file(config.config_file));
     check_keys(table, {"title", "description", "author", "language", "content", "theme", "output",
-                       "navigation"});
+                       "navigation", "base_url"});
+    config.base_url = parse_base_url(string_value(table, "base_url", "/"));
     auto& site = config.site;
     site.title = string_value(table, "title", site.title);
     site.description = string_value(table, "description", site.description, EmptyString::Allow);
@@ -114,6 +115,9 @@ SiteConfig load_config(ConfigRequest const& request) {
     }
     if (request.output_dir) {
         config.output_dir = *request.output_dir;
+    }
+    if (request.base_url) {
+        config.base_url = parse_base_url(*request.base_url);
     }
     return config;
 }
