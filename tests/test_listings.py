@@ -226,7 +226,7 @@ class ListingTests(BuilderFixture):
                     self.write_page(name, "Conflict", "Body.")
                 else:
                     target.write_text("Conflict.", encoding="utf-8")
-                self.assert_failure_preserves_output("Output path conflict", "generated", str(target))
+                self.assert_failure_preserves_output("Output path conflict", "generated", target.as_posix())
                 target.unlink()
                 for parent in list(target.parents):
                     if parent == self.content:
@@ -243,7 +243,7 @@ class ListingTests(BuilderFixture):
                 target = self.content / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text("Conflict.", encoding="utf-8")
-                self.assert_failure_preserves_output("Output path conflict", "generated", str(target))
+                self.assert_failure_preserves_output("Output path conflict", "generated", target.as_posix())
                 target.unlink()
                 if target.parent != self.content:
                     target.parent.rmdir()
