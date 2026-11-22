@@ -341,6 +341,42 @@ class DevTests(BuilderFixture):
         self.assertFalse(self.http_contains("/blog/", 'rel="canonical"'))
         self.assert_no_temporary_directories()
 
+    def test_listing_preview_rolls_back_conflicts_recovers_and_removes_stale_pages(self):
+        config = 'theme = "theme"\nbase_url = "https://example.com/blog/"\npaginate_by = 1\narchives = true\n'
+        self.configure(config)
+        self.write_page("posts/second.md", "Second article", "Second body.", date="2025-01-01")
+        self.start(configure=False, path="/blog/")
+        initial = self.version("/blog/")
+        self.assertTrue(self.http_contains("/blog/page/2/", "Second article"))
+        self.assertTrue(self.http_contains("/blog/archives/", "Second article"))
+        self.assertEqual(self.request("/blog/page/2")[1]["Location"], "/blog/page/2/")
+        self.assertEqual(self.request("/blog/archives")[1]["Location"], "/blog/archives/")
+        self.assertEqual(self.request("/page/2/")[0], 404)
+        self.assertIn(b"EventSource", self.request("/blog/archives/")[2])
+        before = self.snapshot()
+        conflict = self.content / "page/2/index.html"
+        conflict.parent.mkdir(parents=True)
+        conflict.write_text("Conflict.", encoding="utf-8")
+        self.wait_for(lambda: "Output path conflict" in self.logs(), "pagination conflict diagnostic")
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(self.version("/blog/"), initial)
+        self.assertTrue(self.http_contains("/blog/page/2/", "Second article"))
+        conflict.unlink()
+        self.write_page("posts/second.md", "Recovered article", "Recovered body.", date="2025-01-01")
+        self.wait_for(lambda: self.http_contains("/blog/page/2/", "Recovered article"), "listing recovery")
+        self.assertGreater(self.version("/blog/"), initial)
+        self.assertTrue(self.http_contains("/blog/archives/", "Recovered article"))
+        (self.content / "posts/second.md").unlink()
+        self.wait_for(lambda: self.request("/blog/page/2/")[0] == 404, "stale pagination removal")
+        self.assertFalse(self.http_contains("/blog/archives/", "Recovered article"))
+        self.assertFalse(self.http_contains("/blog/", 'class="pagination"'))
+        self.configure(config.replace("archives = true", "archives = false"), atomic=True)
+        self.wait_for(lambda: self.request("/blog/archives/")[0] == 404, "archive disabled")
+        sitemap = self.request("/blog/sitemap.xml")[2]
+        self.assertNotIn(b"/archives/", sitemap)
+        self.assertNotIn(b"/page/2/", sitemap)
+        self.assert_no_temporary_directories()
+
     def test_initial_failed_build_serves_previous_output_and_recovers(self):
         self.build()
         before = self.snapshot()

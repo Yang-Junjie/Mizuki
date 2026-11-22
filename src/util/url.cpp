@@ -1,11 +1,28 @@
 #include "util/url.hpp"
 
+#include "util/path.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <charconv>
 #include <stdexcept>
 
 namespace mizuki {
+
+std::string relative_url(std::filesystem::path const& target, std::filesystem::path const& source) {
+    auto result = encode_url_path(
+        path_to_utf8(target.lexically_relative(source.parent_path()).lexically_normal()));
+    if (result.empty() || result == ".") {
+        return "./";
+    }
+    if (result.find(':') < result.find('/')) {
+        result.insert(0, "./");
+    }
+    if (target.filename().empty() && !result.ends_with('/')) {
+        result += '/';
+    }
+    return result;
+}
 
 namespace {
 

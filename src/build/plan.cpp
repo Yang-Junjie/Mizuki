@@ -111,6 +111,38 @@ BuildPlan plan_build(SiteConfig const& options) {
             plan.assets.push_back({source, destination});
         }
     }
+    for (auto const& page : plan.pages) {
+        if (page.kind == DocumentKind::Article) {
+            auto const& metadata = page.document.metadata;
+            plan.articles.push_back(
+                {metadata.title, metadata.date, path_to_utf8(page.output), metadata.description});
+        }
+    }
+    std::ranges::sort(plan.articles, [](ArticleSummary const& left, ArticleSummary const& right) {
+        if (left.date != right.date) {
+            return left.date > right.date;
+        }
+        return left.url < right.url;
+    });
+    auto const total = plan.articles.size();
+    auto const page_count = total == 0 || options.paginate_by == 0
+                                ? std::size_t{1}
+                                : 1 + (total - 1) / options.paginate_by;
+    for (std::size_t index = 0; index < page_count; ++index) {
+        auto const offset = index * options.paginate_by;
+        auto const count =
+            options.paginate_by == 0 ? total : std::min(options.paginate_by, total - offset);
+        auto const path = index == 0 ? fs::path("index.html")
+                                     : fs::path("page") / std::to_string(index + 1) / "index.html";
+        if (index != 0) {
+            reserve(path, "generated pagination page " + std::to_string(index + 1));
+        }
+        plan.listings.push_back({path, offset, count});
+    }
+    if (options.archives) {
+        reserve("archives/index.html", "generated article archive");
+    }
+
     auto const theme_assets = options.theme_dir / "assets";
     if (fs::exists(theme_assets)) {
         for (auto const& source : regular_files(theme_assets)) {

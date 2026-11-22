@@ -223,3 +223,26 @@ li.task-list-item {
     gap: 0.1rem;
   }
 }
+
+/* 列表分页与年份归档 */
+.pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-block: 2rem;
+}
+
+.pagination [aria-current],
+.empty-state {
+    color: var(--muted);
+}
+
+.archive-year {
+    margin-block: 2rem;
+}
+
+.archive-year h2 {
+    font-size: 1.25rem;
+}

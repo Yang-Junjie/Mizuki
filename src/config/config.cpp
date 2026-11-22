@@ -6,6 +6,7 @@
 #include <toml++/toml.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <exception>
 #include <initializer_list>
 #include <stdexcept>
@@ -76,8 +77,22 @@ std::vector<NavigationItem> parse_navigation(toml::node const& node) {
 void read_config_file(SiteConfig& config) {
     auto const table = toml::parse(read_file(config.config_file));
     check_keys(table, {"title", "description", "author", "language", "content", "theme", "output",
-                       "navigation", "base_url"});
+                       "navigation", "base_url", "paginate_by", "archives"});
     config.base_url = parse_base_url(string_value(table, "base_url", "/"));
+    if (auto const* node = table.get("paginate_by")) {
+        auto const value = node->value<std::int64_t>();
+        if (!node->is_integer() || !value || !std::in_range<std::size_t>(*value)) {
+            throw std::runtime_error("Configuration 'paginate_by' must be a non-negative integer");
+        }
+        config.paginate_by = static_cast<std::size_t>(*value);
+    }
+    if (auto const* node = table.get("archives")) {
+        auto const value = node->value<bool>();
+        if (!node->is_boolean() || !value) {
+            throw std::runtime_error("Configuration 'archives' must be a boolean");
+        }
+        config.archives = *value;
+    }
     auto& site = config.site;
     site.title = string_value(table, "title", site.title);
     site.description = string_value(table, "description", site.description, EmptyString::Allow);

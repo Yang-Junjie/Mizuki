@@ -2,6 +2,7 @@
 
 #include "util/url.hpp"
 
+#include <cstddef>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -28,6 +29,8 @@ struct SiteConfig {
     std::filesystem::path config_file;
     SiteMetadata site;
     BaseUrl base_url;
+    std::size_t paginate_by{0};
+    bool archives{false};
 };
 
 } // namespace mizuki

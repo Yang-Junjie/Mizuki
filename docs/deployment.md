@@ -37,3 +37,5 @@ base_url = "https://example.com/blog/"
 如果内容仓库不包含 Mizuki 源码，需要先在自己的工作流中安装或编译 Mizuki，再使用相同的构建命令和 Pages 上传、部署步骤。
 
 工作流结构参考 GitHub 官方的 [自定义 Pages 工作流说明](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)、[静态站点示例](https://github.com/actions/starter-workflows/blob/main/pages/static.yml) 和 [`configure-pages` 输出定义](https://github.com/actions/configure-pages/blob/v5/action.yml)。
+
+启用首页分页或文章归档时，整个输出目录应一并发布，包括 `page/2/index.html` 等后续分页与 `archives/index.html`。它们的 canonical 和 sitemap 地址使用目录形式（如 `/blog/page/2/`、`/blog/archives/`），托管服务需要支持目录下的 `index.html`。Mizuki 本地预览与 GitHub Pages 都按此结构提供页面。

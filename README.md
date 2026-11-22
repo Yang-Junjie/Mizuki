@@ -46,6 +46,8 @@ base_url = "/"
 content = "content"
 theme = "themes/default"
 output = "dist"
+paginate_by = 10
+archives = true
 
 [[navigation]]
 title = "首页"
@@ -54,9 +56,13 @@ url = "/"
 [[navigation]]
 title = "关于"
 url = "/pages/about.md"
+
+[[navigation]]
+title = "归档"
+url = "/archives/"
 ```
 
-支持的顶层键只有以上九项。除 `navigation` 外均为字符串；`description` 和 `author` 允许为空，其余不能为空或全是空白。导航项只能包含非空字符串 `title` 和 `url`。省略导航时默认只有首页，`navigation = []` 隐藏导航。未知键、类型错误、重复键或 TOML 语法错误都会报错，并给出配置文件位置。
+支持的顶层键只有上例中的项目。`paginate_by` 必须是非负整数，`archives` 必须是布尔值；其余除 `navigation` 外均为字符串。字符串字段中，`description` 和 `author` 允许为空，其余不能为空或全是空白。导航项只能包含非空字符串 `title` 和 `url`。省略导航时默认只有首页，`navigation = []` 隐藏导航。未知键、类型错误、重复键或 TOML 语法错误都会报错，并给出配置文件位置。
 
 所有命令支持指定配置及目录：
 
@@ -126,7 +132,7 @@ draft: false
 ```
 
 - `title` 必填且不能为空。
-- 普通文章必须有有效的 `date`，严格使用 `YYYY-MM-DD`，年份为 0001–9999，并校验闰年与每月天数。首页与 RSS 按日期降序排列，相同日期按输出 URL 排序。未来日期仍会发布，不做定时发布处理。原先使用任意日期文本的文章需要先改为此格式。
+- 普通文章必须有有效的 `date`，严格使用 `YYYY-MM-DD`，年份为 0001–9999，并校验闰年与每月天数。首页、归档与 RSS 按日期降序排列，相同日期按输出 URL 排序。未来日期仍会发布，不做定时发布处理。原先使用任意日期文本的文章需要先改为此格式。
 - 内容根目录下 `pages/` 内的 Markdown 是独立页面，使用 `layouts/page.html`，允许省略 `date`；若提供日期则使用同一套格式与日历校验。独立页面不进入首页文章列表，可以加入导航。
 - `description` 是可选的单行纯文本，可用成对的单引号或双引号包裹。默认主题用它作为页面的 meta description，省略或为空时回退到站点 `description`；RSS 仅在文章自身有描述时输出摘要，不从正文自动截取。
 - `draft: true` 跳过页面，不生成 HTML，不占用输出路径。草稿仍需有合法的 front matter。
@@ -170,23 +176,49 @@ base_url = "https://example.com/blog/"
 
 启用生成后，`rss.xml`、`sitemap.xml` 是受管理的输出路径，与内容文件冲突时会明确报出生成器和输入来源。生成失败会保留之前的完整站点。
 
+## 首页分页与文章归档
+
+```toml
+paginate_by = 10
+archives = true
+```
+
+`paginate_by` 设置每页文章数，内置默认值 `0` 表示不分页；`archives` 控制年份归档，内置默认值为 `false`。仓库示例显式启用这两项，已有配置省略时保留原有输出。两项相互独立，也可以只启用其中一项。
+
+首页仍位于 `/`，第二页起使用 `/page/2/`、`/page/3/`，对应输出 `page/2/index.html` 等文件。不额外生成 `/page/1/`。空站点也有一张首页；文章数不超过每页数量时不生成额外分页，也不显示分页导航。默认主题在后续分页的浏览器标题中加入页码。
+
+启用归档后生成 `/archives/`，对应输出 `archives/index.html`，按年份降序分组，列出全部已发布文章；同一年内沿用日期降序、同日按输出 URL 排序。草稿、独立页面和复制的 HTML 文件不进入文章列表。没有文章时归档显示空状态。可在导航中加入入口：
+
+```toml
+[[navigation]]
+title = "归档"
+url = "/archives/"
+```
+
+分页和归档的文章链接、主题资源和主导航都相对当前页面生成，支持根目录与子路径部署。配置完整 `base_url` 时，每页 canonical 使用对应的目录地址，sitemap 收录首页、后续分页、归档以及内容页面；RSS 始终使用全部已发布文章，不受分页数量影响。
+
+分页输出与归档也参与构建前的路径冲突检查。文章删除、改为草稿、调大分页数量或关闭功能后，下次成功构建会清除多余页面；失败保留之前的完整输出。关闭归档前应同时移除指向 `/archives/` 的导航，否则会因目标不存在而报错。
+
+自定义主题需要在 `layouts/home.html` 放入 `{pagination}` 才能显示分页导航。只有实际产生多页时，这个占位符才是必需的；缺失时构建明确报错，避免旧文章失去入口。启用归档还需要提供 `layouts/archives.html`，其中必须包含 `{archives}` 和 `{asset_base}`。默认关闭这两项时，旧主题无需调整。
+
 ## 主题模板
 
 | 模板 | 必需占位符 | 用途 |
 | --- | --- | --- |
-| `layouts/home.html` | `{asset_base}`、`{posts}` | 生成首页；不读取 `content/index.md` |
+| `layouts/home.html` | `{asset_base}`、`{posts}`；实际多页时还需 `{pagination}` | 首页及后续分页；不读取 `content/index.md` |
+| `layouts/archives.html` | `{asset_base}`、`{archives}` | 按年份分组的归档；仅启用归档时需要 |
 | `layouts/post.html` | `{markdown}`、`{asset_base}`、`{title}`、`{date}` | 普通文章 |
 | `layouts/page.html` | `{markdown}`、`{asset_base}`、`{title}` | 独立页面；没有已发布独立页面时无需此模板 |
 
-`{asset_base}` 是相对当前页面的主题资源目录，包含结尾 `/`；`{posts}` 是已发布文章的 HTML 列表。文章和独立页面都可使用 `{date}`，独立页面省略日期时替换为空字符串。
+`{asset_base}` 是相对当前页面的主题资源目录，包含结尾 `/`；`{posts}` 是当前页的已发布文章 HTML 列表；`{archives}` 是完整的年份分组 HTML。首页模板还可选用 `{title}`（第一页为站点标题，后续页附加页码）、`{page_number}` 和 `{page_count}`；页码从 1 开始。`{pagination}` 是完整的分页导航 HTML，只有一页时为空。文章和独立页面都可使用 `{date}`，独立页面省略日期时替换为空字符串。
 
-所有模板还可选用 `{site_title}`、`{site_description}`、`{site_author}`、`{site_language}`、`{navigation}`、`{base_url}` 和 `{base_path}`。`{base_url}` 是规范化后的完整配置地址，`{base_path}` 是规范化后的部署路径，两者都包含结尾 `/`。新占位符均可省略，现有主题仍可使用。文本和属性值会转义 HTML；正文、文章列表和导航作为 HTML 插入。替换值中的占位符不会再次替换。
+所有模板还可选用 `{site_title}`、`{site_description}`、`{site_author}`、`{site_language}`、`{navigation}`、`{base_url}` 和 `{base_path}`。`{base_url}` 是规范化后的完整配置地址，`{base_path}` 是规范化后的部署路径，两者都包含结尾 `/`。这些站点占位符均可省略，现有主题仍可使用。文本和属性值会转义 HTML；正文、文章列表和导航作为 HTML 插入。替换值中的占位符不会再次替换。
 
 发布信息还提供以下可选占位符，旧主题无需修改即可继续使用：
 
 | 占位符 | 内容 |
 | --- | --- |
-| `{description}` | 首页使用站点描述；文章与独立页面优先使用自身描述，为空时回退到站点描述。作为文本转义 |
+| `{description}` | 首页、后续分页和归档使用站点描述；文章与独立页面优先使用自身描述，为空时回退到站点描述。作为文本转义 |
 | `{canonical_url}` | 当前页面的完整规范地址；首页为站点根地址。未配置域名时为空，作为文本转义 |
 | `{feed_url}` | RSS 的完整地址；未配置域名时为空，作为文本转义 |
 | `{publication_head}` | 完整的 canonical 和 RSS 自动发现 `<link>` 标签，放入 `<head>`；未配置域名时为空 |
@@ -196,7 +228,7 @@ base_url = "https://example.com/blog/"
 
 ## 路径冲突与输出管理
 
-构建前统一检查所有页面、生成的首页、启用的 RSS 与 sitemap、内容静态文件和主题资源的输出路径。多个输入占用同一位置会直接报错，列出目标和两个来源，例如：
+构建前统一检查所有内容页面、首页及分页、启用的归档、RSS 与 sitemap、内容静态文件和主题资源的输出路径。多个输入占用同一位置会直接报错，列出目标和两个来源，例如：
 
 ```text
 Output path conflict

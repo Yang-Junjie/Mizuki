@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <span>
 #include <string>
 
@@ -12,7 +13,10 @@ struct ArticleSummary {
     std::string description;
 };
 
-// Articles arrive in publication order, shared by the homepage and RSS.
-std::string render_article_list(std::span<ArticleSummary const> articles);
+// Articles arrive in publication order, shared by listings, archives and RSS.
+std::string render_article_list(std::span<ArticleSummary const> articles,
+                                std::filesystem::path const& output);
+std::string render_archive(std::span<ArticleSummary const> articles,
+                           std::filesystem::path const& output);
 
 } // namespace mizuki

@@ -8,6 +8,9 @@ base_url = "/"
 content = "content"
 theme = "themes/default"
 output = "dist"
+# 设为 0 可关闭分页；归档按年份列出全部已发布文章。
+paginate_by = 10
+archives = true
 
 [[navigation]]
 title = "首页"
@@ -16,3 +19,7 @@ url = "/"
 [[navigation]]
 title = "关于"
 url = "/pages/about.md"
+
+[[navigation]]
+title = "归档"
+url = "/archives/"
