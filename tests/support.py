@@ -42,15 +42,20 @@ class BuilderFixture(unittest.TestCase):
         self.write_page("index.md", "Home", "Welcome.")
         self.write_page("posts/first.md", "First post", "Original body.")
 
-    def write_page(self, name, title, body, draft=False, date="2026-11-16", description=None):
+    def write_page(self, name, title, body, draft=False, date="2026-11-16", description=None, atomic=False):
         path = self.content / name
         path.parent.mkdir(parents=True, exist_ok=True)
         summary = "" if description is None else f"description: {description}\n"
-        path.write_text(
-            f"---\ntitle: {title}\ndate: {date}\n"
-            f"draft: {'true' if draft else 'false'}\n{summary}---\n\n{body}\n",
-            encoding="utf-8",
-        )
+        text = (f"---\ntitle: {title}\ndate: {date}\n"
+                f"draft: {'true' if draft else 'false'}\n{summary}---\n\n{body}\n")
+        if atomic:
+            # Stage outside watched inputs so no valid intermediate source is published.
+            with tempfile.TemporaryDirectory(dir=self.root) as staging:
+                source = Path(staging) / path.name
+                source.write_text(text, encoding="utf-8")
+                source.replace(path)
+        else:
+            path.write_text(text, encoding="utf-8")
 
     def build(self, *, success=True, output=None, cwd=None):
         result = subprocess.run(

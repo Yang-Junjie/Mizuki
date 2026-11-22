@@ -75,6 +75,15 @@ class DevTests(BuilderFixture):
         finally:
             connection.close()
 
+    def assert_no_temporary_directories(self, output=None):
+        process = getattr(self, "process", None)
+        if process is None or process.poll() is not None:
+            return super().assert_no_temporary_directories(output)
+        output = self.output if output is None else Path(output)
+        # Output becomes visible before the transaction finishes deleting its backup.
+        self.wait_for(lambda: not list(output.parent.glob(output.name + ".mizuki-*")),
+                      "build directory cleanup")
+
     def disk_contains(self, path, text):
         path = Path(path)
         return path.is_file() and text in path.read_text(encoding="utf-8")
@@ -430,10 +439,10 @@ class DevTests(BuilderFixture):
         self.assertNotIn(b"EventSource", feed)
         self.assertNotIn(b"EventSource", sitemap)
         before = self.snapshot()
-        self.write_page("posts/first.md", "Broken XML", "New body.", description="invalid\x01")
+        self.write_page("posts/first.md", "Broken XML", "New body.", description="invalid\x01", atomic=True)
         self.wait_for(lambda: "Invalid UTF-8 or XML character" in self.logs(), "XML failure diagnostic")
         self.assertEqual(self.snapshot(), before)
-        self.assertEqual(self.version("/blog/"), initial)
+        self.assertEqual(self.version("/blog/"), initial, self.logs())
         self.assertEqual(self.request("/blog/rss.xml")[2], feed)
         self.write_page("posts/first.md", "Recovered feed", "Recovered body.", description="New summary")
         self.wait_for(lambda: self.http_contains("/blog/rss.xml", "Recovered feed"), "RSS recovery")
@@ -449,6 +458,8 @@ class DevTests(BuilderFixture):
         config = 'theme = "theme"\nbase_url = "https://example.com/blog/"\npaginate_by = 1\narchives = true\n'
         self.configure(config)
         self.write_page("posts/second.md", "Second article", "Second body.", date="2025-01-01")
+        conflict = self.content / "page/2/index.html"
+        conflict.parent.mkdir(parents=True)
         self.start(configure=False, path="/blog/")
         initial = self.version("/blog/")
         self.assertTrue(self.http_contains("/blog/page/2/", "Second article"))
@@ -458,12 +469,10 @@ class DevTests(BuilderFixture):
         self.assertEqual(self.request("/page/2/")[0], 404)
         self.assertIn(b"EventSource", self.request("/blog/archives/")[2])
         before = self.snapshot()
-        conflict = self.content / "page/2/index.html"
-        conflict.parent.mkdir(parents=True)
         conflict.write_text("Conflict.", encoding="utf-8")
         self.wait_for(lambda: "Output path conflict" in self.logs(), "pagination conflict diagnostic")
         self.assertEqual(self.snapshot(), before)
-        self.assertEqual(self.version("/blog/"), initial)
+        self.assertEqual(self.version("/blog/"), initial, self.logs())
         self.assertTrue(self.http_contains("/blog/page/2/", "Second article"))
         conflict.unlink()
         self.write_page("posts/second.md", "Recovered article", "Recovered body.", date="2025-01-01")

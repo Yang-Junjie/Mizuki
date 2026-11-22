@@ -1,23 +1,23 @@
 /* Public theme hooks. Override variables after this stylesheet to change the palette. */
 :root {
-  --syntax-comment: #806778;
-  --syntax-keyword: #a53563;
-  --syntax-string: #306b63;
-  --syntax-number: #5c61a3;
-  --syntax-title: #8154a0;
-  --syntax-variable: #926329;
+  --syntax-comment: #57606a;
+  --syntax-keyword: #a31542;
+  --syntax-string: #0a526b;
+  --syntax-number: #075baf;
+  --syntax-title: #6f42a1;
+  --syntax-variable: #85420f;
   --syntax-addition: #1a7f37;
   --syntax-deletion: #a31542;
-  --code-font-size: 0.82rem;
-  --code-line-height: 1.85;
-  --code-radius: 13px;
+  --code-font-size: 0.9rem;
+  --code-line-height: 1.7;
+  --code-radius: 8px;
   --math-font-size: 1.05em;
   --footnote-font-size: 0.9em;
-  --admonition-note: #5c61a3;
-  --admonition-tip: #306b63;
-  --admonition-important: #8154a0;
-  --admonition-warning: #926329;
-  --admonition-caution: #a53563;
+  --admonition-note: #0969da;
+  --admonition-tip: #1a7f37;
+  --admonition-important: #8250df;
+  --admonition-warning: #9a6700;
+  --admonition-caution: #cf222e;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -75,7 +75,7 @@
   color: inherit;
   background: none;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 4px;
   font: inherit;
   cursor: pointer;
   padding: 0.3rem 0.5rem;
@@ -121,9 +121,8 @@ x-equation.math-error { color: var(--admonition-caution); }
   margin-block: 1.5em;
   padding: 0.5em 1.1em;
   border: 1px solid var(--border);
-  border-inline-start: 3px solid var(--admonition-color);
-  border-radius: 12px;
-  background: var(--surface);
+  border-inline-start: 4px solid var(--admonition-color);
+  border-radius: 6px;
 }
 .admonition-tip { --admonition-color: var(--admonition-tip); }
 .admonition-important { --admonition-color: var(--admonition-important); }

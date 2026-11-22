@@ -12,8 +12,8 @@
 {% if page.canonical_url != "" %}  <link rel="canonical" href="{{ page.canonical_url }}">
 {% endif %}  <link rel="icon" type="image/png" sizes="48x48" href="{{ asset_base }}images/favicon.png">
   <link rel="preload" href="{{ asset_base }}fonts/nunito/latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="{{ asset_base }}css/docs.css">
 {% include "partials/reading.html" %}
+  <link rel="stylesheet" href="{{ asset_base }}css/docs.css">
   {% block head %}{% endblock %}
 </head>
 <body{% if page.kind == "home" %} class="home-page"{% endif %}>

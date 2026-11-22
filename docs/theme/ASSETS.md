@@ -10,4 +10,4 @@
 
 字体通过 Google Fonts CSS API 获取；许可原文分别保存在 `google/fonts` 仓库的 `ofl/nunito/OFL.txt` 和 `ofl/jetbrainsmono/OFL.txt`。代码高亮和数学公式资源的来源见 `assets/vendor/README.txt`。
 
-颜色、字号、字体和圆角在 `assets/css/docs.css` 中定义；技术写作元素使用 `assets/css/reading.css` 的主题变量。字体路径相对于 CSS，图片路径通过模板的 `asset_base` 生成，支持部署在仓库子路径下。
+颜色、字号、字体和圆角在 `assets/css/docs.css` 中定义；`assets/css/reading.css` 与默认主题共享基础阅读样式，本站在随后加载的 `assets/css/docs.css` 中覆盖主题变量和组件外观。字体路径相对于 CSS，图片路径通过模板的 `asset_base` 生成，支持部署在仓库子路径下。

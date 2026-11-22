@@ -25,6 +25,24 @@
   --accent-soft: #fce5ee;
   --border: #eddde4;
   --code-background: #fbf0f4;
+  --syntax-comment: #806778;
+  --syntax-keyword: #a53563;
+  --syntax-string: #306b63;
+  --syntax-number: #5c61a3;
+  --syntax-title: #8154a0;
+  --syntax-variable: #926329;
+  --syntax-addition: #1a7f37;
+  --syntax-deletion: #a31542;
+  --code-font-size: 0.82rem;
+  --code-line-height: 1.85;
+  --code-radius: 13px;
+  --math-font-size: 1.05em;
+  --footnote-font-size: 0.9em;
+  --admonition-note: #5c61a3;
+  --admonition-tip: #306b63;
+  --admonition-important: #8154a0;
+  --admonition-warning: #926329;
+  --admonition-caution: #a53563;
   --pink: #f6b6cb;
   --mint: #e6f2ed;
   --mint-ink: #426d61;
@@ -52,6 +70,14 @@ a, button, summary { -webkit-tap-highlight-color: transparent; }
 h1, h2, h3, h4, h5, h6 { line-height: 1.5; text-wrap: pretty; }
 .skip-link { position: fixed; z-index: 10; left: 20px; top: -100px; padding: 10px 20px; background: var(--surface); border: 1px solid var(--accent); border-radius: 12px; }
 .skip-link:focus { top: 12px; }
+
+/* Reading components share their base rules with the default theme. */
+.code-copy { border-radius: 7px; }
+:is(.admonition-note, .admonition-tip, .admonition-important, .admonition-warning, .admonition-caution) {
+  border-inline-start-width: 3px;
+  border-radius: 12px;
+  background: var(--surface);
+}
 
 /* The header is shared by the landing page and the reading layout. */
 .site-header { height: var(--header-height); border-bottom: 1px solid var(--border); background: var(--header-background); backdrop-filter: blur(16px); position: sticky; top: 0; z-index: 5; }
@@ -331,6 +357,19 @@ pre code { font-size: inherit; background: none; border: 0; padding: 0; border-r
     --accent-soft: #442c3c;
     --border: #4c3847;
     --code-background: #30232e;
+    --syntax-comment: #a2aab5;
+    --syntax-keyword: #ff8fa3;
+    --syntax-string: #a5d6ff;
+    --syntax-number: #91caff;
+    --syntax-title: #d7b6ff;
+    --syntax-variable: #ffc68a;
+    --syntax-addition: #7ee787;
+    --syntax-deletion: #ff8fa3;
+    --admonition-note: #79b8ff;
+    --admonition-tip: #7ee787;
+    --admonition-important: #d7b6ff;
+    --admonition-warning: #e3b341;
+    --admonition-caution: #ff8fa3;
     --pink: #98617b;
     --mint: #293f39;
     --mint-ink: #abd6c5;
