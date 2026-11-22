@@ -3,7 +3,7 @@ title = "版本发布"
 description = "维护版本号，验证二进制包与离线源码包，并通过标签生成 Release 草稿。"
 +++
 
-版本号由根目录 `CMakeLists.txt` 的 `project(Mizuki VERSION ...)` 统一声明。`mizuki --version`、压缩包名称和标签校验都使用该值；发布标签必须是 `v` 加完整版本号，例如 `v0.1.0`。
+版本号由根目录 `CMakeLists.txt` 的 `project(Mizuki VERSION ...)` 统一声明。`mizuki --version`、压缩包名称和标签校验都使用该值；发布标签必须是 `v` 加完整版本号，例如 `v0.2.0`。
 
 ## 本地构建与验证
 
@@ -44,8 +44,8 @@ cpack --config build/distribution/CPackSourceConfig.cmake -C Release
 手动打包不代表完成验证。可使用相同的验证入口，检查并重新生成产物：
 
 ```sh
-python3 tests/test_package.py --build-dir build/distribution --version 0.1.0
-python3 tests/test_package.py --build-dir build/distribution --version 0.1.0 --source
+python3 tests/test_package.py --build-dir build/distribution --version 0.2.0
+python3 tests/test_package.py --build-dir build/distribution --version 0.2.0 --source
 ```
 
 ## 兼容基线
@@ -69,7 +69,7 @@ cmake --build build --parallel 2
 
 1. 修改 `CMakeLists.txt` 中的版本，并在仓库根目录的 `CHANGELOG.md` 增加相同版本的 `## VERSION` 章节。
 2. 提交改动，确认分支 CI 的格式检查、功能测试和发布包验证通过。
-3. 在该提交上创建并推送对应版本标签，例如 `git tag v0.1.0` 和 `git push origin v0.1.0`。
+3. 在该提交上创建并推送对应版本标签，例如 `git tag v0.2.0` 和 `git push origin v0.2.0`。
 4. `release.yml` 复用完整 CI。标签与项目版本不一致时，配置阶段直接失败。
 5. 两个平台通过后，工作流下载三个已验证的归档及校验文件，再次核对 SHA-256，从更新记录中提取本版本说明，并创建 Release 草稿。
 6. 检查草稿中的版本、说明和文件后，在 GitHub 上手动发布。

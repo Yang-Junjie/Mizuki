@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(Mizuki VERSION 0.1.0 LANGUAGES C CXX)
+project(Mizuki VERSION 0.2.0 LANGUAGES C CXX)
 
 set(MIZUKI_RELEASE_TAG "" CACHE STRING "Release tag to check against the project version")
 if(MIZUKI_RELEASE_TAG AND NOT MIZUKI_RELEASE_TAG STREQUAL "v${PROJECT_VERSION}")
