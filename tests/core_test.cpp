@@ -44,6 +44,27 @@ void document_owns_its_metadata_and_body() {
     require(document.body == "Owned body.\n", "Parsed body depends on source lifetime");
 }
 
+void toml_document_owns_typed_metadata_and_preserves_body() {
+    auto document = [] {
+        std::string source = "\xEF\xBB\xBF+++\r\ntitle = \"Owned title\"\r\n"
+                             "date = 2026-11-22\r\n[extra.author]\r\nname = \"Artichoke\"\r\n"
+                             "+++\r\n\r\nBody.\r\n---\r\n+++\r\n";
+        auto result = mizuki::parse_document(source, mizuki::DocumentKind::Article);
+        source.assign(source.size(), 'x');
+        return result;
+    }();
+    require(document.metadata.title == "Owned title", "TOML title depends on source lifetime");
+    require(document.metadata.date == "2026-11-22", "Native TOML date was not normalized");
+    require(document.metadata.extra.at("author").at("name") == "Artichoke",
+            "TOML extra depends on source lifetime");
+    require(document.body == "\r\nBody.\r\n---\r\n+++\r\n", "Document body was changed");
+    auto const empty =
+        mizuki::parse_document("+++\ntitle = \"Empty\"\n+++", mizuki::DocumentKind::Page);
+    require(empty.body.empty(), "Closing delimiter without newline added a body");
+    require(empty.metadata.extra.is_object() && empty.metadata.extra.empty(),
+            "Missing extra must be an empty object");
+}
+
 void rendered_markdown_owns_its_html_and_heading_metadata() {
     auto rendered = [] {
         std::string source = "## *安装* 与 `C++`\n\n### 配置\n";
@@ -145,6 +166,7 @@ void sitemap_enforces_single_file_limits() {
 int main() {
     try {
         document_owns_its_metadata_and_body();
+        toml_document_owns_typed_metadata_and_preserves_body();
         rendered_markdown_owns_its_html_and_heading_metadata();
         loaded_template_is_reusable_and_renders_independent_values();
         template_failure_has_context_and_does_not_poison_later_renders();

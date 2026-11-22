@@ -1,0 +1,38 @@
+/* 所有排版由主题定义；本例不需要 JavaScript 或额外资源。 */
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  line-height: 1.7;
+}
+
+body {
+  max-width: 48rem;
+  margin: auto;
+  padding: 2rem 1rem;
+  overflow-wrap: anywhere;
+}
+
+header, aside {
+  margin-block: 2rem;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+pre {
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}

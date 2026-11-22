@@ -127,8 +127,34 @@ def smoke_test(binary, version, root, documentation_config):
         "--description", "Downloaded binary", cwd=site, env=environment)
     run(binary, "new", "posts/draft.md", "--title", "Unpublished draft", "--draft",
         cwd=site, env=environment)
+    article = site / "content/posts/第一篇文章.md"
+    source = article.read_text(encoding="utf-8")
+    check(source.startswith("+++\n"), "Content creation did not generate TOML front matter")
+    article.write_text(source.replace("\n+++\n", '\n[extra]\nshow_toc = false\n'
+                       'cover = "images/cover.svg"\n+++\n', 1)
+                       + "## Package section\n\n```cpp\nint answer = 42;\n```\n\n"
+                         "$x^2$ and a note[^n].\n\n[^n]: Packaged footnote.\n", encoding="utf-8")
+    cover = site / "content/images/cover.svg"
+    cover.parent.mkdir()
+    cover.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10">'
+                     '<rect width="20" height="10" fill="teal"/></svg>', encoding="utf-8")
     run(binary, "build", "--base-url", "https://example.com/blog/", cwd=site, env=environment)
     output = site / "dist"
+    for name in ("index.html", "archives/index.html", "posts/第一篇文章.html"):
+        check('src="/blog/images/cover.svg"' in (output / name).read_text(encoding="utf-8"),
+              f"Packaged theme did not render the document cover: {name}")
+    page = (output / "posts/第一篇文章.html").read_text(encoding="utf-8")
+    check('class="toc"' not in page and 'id="package-section"' in page,
+          "Packaged theme did not honor the page TOC setting")
+    check('<x-equation>x^2</x-equation>' in page and 'class="footnotes"' in page,
+          "Packaged Markdown math or footnotes are unavailable")
+    check('../assets/vendor/highlight/highlight.min.js' in page
+          and '../assets/vendor/katex/katex.min.js' in page,
+          "Packaged theme did not load local reading assets")
+    for name in ["assets/js/code.js", "assets/js/math.js", "assets/css/reading.css",
+                 "assets/vendor/highlight/LICENSE", "assets/vendor/katex/LICENSE",
+                 "assets/vendor/katex/fonts/KaTeX_Main-Regular.woff2"]:
+        check((output / name).is_file(), f"Missing offline reading asset: {name}")
     for name in ["index.html", "archives/index.html", "pages/about.html",
                  "posts/第一篇文章.html", "assets/css/style.css", "rss.xml", "sitemap.xml"]:
         check((output / name).is_file(), f"Missing generated file: {name}")
@@ -147,19 +173,28 @@ def smoke_test(binary, version, root, documentation_config):
                  "pages/getting-started.html", "pages/deployment.html", "assets/css/docs.css"]:
         check((documentation / name).is_file(), f"Missing packaged documentation output: {name}")
 
+    minimal_theme = documentation_config.parent.parent / "examples/minimal-theme"
+    minimal_output = root / "minimal"
+    run(binary, "build", "--theme", minimal_theme, "--output", minimal_output,
+        "--base-url", "https://example.com/blog/", cwd=site, env=environment)
+    minimal_page = (minimal_output / "posts/第一篇文章.html").read_text(encoding="utf-8")
+    check('aria-label="独立页面"' in minimal_page and 'href="../pages/about.html"' in minimal_page,
+          "Packaged minimal theme did not render the site-wide pages collection")
+    check('aria-label="最近文章"' in minimal_page,
+          "Packaged minimal theme did not render the site-wide posts collection")
+
 
 def check_binary_package(package_root):
     executable = "mizuki.exe" if os.name == "nt" else "mizuki"
     expected = {f"bin/{executable}", "share/mizuki/LICENSE", "share/mizuki/README.md",
                 "share/mizuki/CHANGELOG.md", "share/mizuki/CONTRIBUTING.md",
                 "share/mizuki/RELEASING.md", "share/mizuki/licenses/fmt/LICENSE"}
-    expected.update(f"share/mizuki/docs/{name}" for name in [
-        "README.md", "mizuki.toml", "content/pages/getting-started.md",
-        "content/pages/themes.md", "content/pages/architecture.md", "content/pages/deployment.md",
-        "theme/theme.toml", "theme/assets/css/docs.css", "theme/layouts/base.html",
-        "theme/layouts/home.html", "theme/layouts/page.html",
-        "theme/layouts/partials/navigation.html", "theme/layouts/partials/toc.html",
-    ])
+    documentation_source = Path(__file__).resolve().parents[1] / "docs"
+    expected.update("share/mizuki/docs/" + path.relative_to(documentation_source).as_posix()
+                    for path in documentation_source.rglob("*") if path.is_file())
+    examples_source = Path(__file__).resolve().parents[1] / "examples"
+    expected.update("share/mizuki/examples/" + path.relative_to(examples_source).as_posix()
+                    for path in examples_source.rglob("*") if path.is_file())
     expected.update(f"share/mizuki/licenses/{name}/LICENSE" + ({"md4c": ".md", "json": ".MIT"}.get(name, ""))
                     for name in DEPENDENCIES)
     actual = {path.relative_to(package_root).as_posix() for path in package_root.rglob("*")

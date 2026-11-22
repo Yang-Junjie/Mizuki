@@ -41,15 +41,21 @@ Json page_context(SiteConfig const& config, BuildPlan const& plan, fs::path cons
           {"language", site.language},
           {"base_url", config.base_url.origin + config.base_url.path},
           {"base_path", config.base_url.path},
-          {"extra", extra}}},
+          {"extra", extra},
+          {"posts", summary_data(plan.articles, output)},
+          {"pages", summary_data(plan.independent_pages, output)}}},
         {"page",
          {{"kind", "home"},
           {"title", site.title},
           {"date", ""},
           {"description", site.description},
           {"content", ""},
+          {"extra", Json::object()},
           {"url", url},
           {"headings", Json::array()},
+          {"features",
+           {{"code", false}, {"math", false}, {"footnotes", false}, {"admonitions", false}}},
+          {"code_languages", Json::array()},
           {"canonical_url", canonical}}},
         {"asset_base", relative_url(fs::path("assets") / "", output)},
         {"feed_url", published_url(config.base_url, "rss.xml")},
@@ -62,13 +68,14 @@ Json page_context(SiteConfig const& config, BuildPlan const& plan, fs::path cons
     };
 }
 
-Json article_data(std::span<ArticleSummary const> articles, fs::path const& output) {
+Json summary_data(std::span<ContentSummary const> summaries, fs::path const& output) {
     auto result = Json::array();
-    for (auto const& article : articles) {
-        result.push_back({{"title", article.title},
-                          {"date", article.date},
-                          {"description", article.description},
-                          {"url", relative_url(path_from_utf8(article.url), output)}});
+    for (auto const& summary : summaries) {
+        result.push_back({{"title", summary.title},
+                          {"date", summary.date},
+                          {"description", summary.description},
+                          {"extra", summary.extra},
+                          {"url", relative_url(path_from_utf8(summary.url), output)}});
     }
     return result;
 }

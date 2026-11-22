@@ -1,4 +1,4 @@
-{% if site.extra.show_toc and length(toc) > 0 %}<aside class="table-of-contents">
+{% if default(page.extra.show_toc, site.extra.show_toc) and length(toc) > 0 %}<aside class="table-of-contents">
   <details open>
     <summary>本页内容</summary>
     <nav aria-label="本页目录">

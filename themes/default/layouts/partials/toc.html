@@ -1,4 +1,4 @@
-{% if site.extra.show_toc and length(toc) > 0 %}<nav class="toc" aria-label="文章目录">
+{% if default(page.extra.show_toc, site.extra.show_toc) and length(toc) > 0 %}<nav class="toc" aria-label="文章目录">
 <details open>
 <summary>目录</summary>
 <ol>

@@ -1,4 +1,4 @@
-# 路径相对本文件；根目录的 mizuki.toml 继续用于博客示例。
+# 所有相对目录均以本配置文件所在目录为基准。
 title = "Mizuki 文档"
 description = "用 Mizuki 构建站点、开发主题，理解它的实现。"
 author = "Mizuki contributors"
@@ -10,6 +10,11 @@ output = "../build/docs"
 paginate_by = 0
 archives = false
 
+[markdown]
+math = true
+footnotes = true
+admonitions = true
+
 [[navigation]]
 title = "文档首页"
 url = "/"
@@ -17,6 +22,10 @@ url = "/"
 [[navigation]]
 title = "快速开始"
 url = "/pages/getting-started.md"
+
+[[navigation]]
+title = "技术写作"
+url = "/pages/writing.md"
 
 [[navigation]]
 title = "主题开发"

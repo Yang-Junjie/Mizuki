@@ -13,7 +13,10 @@ class BuilderTests(BuilderFixture):
         self.build()
         self.assertEqual(
             set(self.snapshot()),
-            {"index.html", "posts/first.html", "assets/css/style.css"},
+            {"index.html", "posts/first.html"} | {
+                "assets/" + path.relative_to(self.theme / "assets").as_posix()
+                for path in (self.theme / "assets").rglob("*") if path.is_file()
+            },
         )
         self.assertIn("Original body.", (self.output / "posts/first.html").read_text())
         homepage = (self.output / "index.html").read_text()

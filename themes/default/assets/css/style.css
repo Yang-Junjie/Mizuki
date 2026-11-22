@@ -107,7 +107,28 @@ header time:empty {
 }
 
 .post-item a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.post-cover {
+  flex: 0 0 5rem;
+  width: 5rem;
+  height: 3.25rem;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.page-cover {
+  display: block;
+  width: 100%;
+  max-height: 24rem;
+  margin-block-end: 1.5rem;
+  object-fit: cover;
+  border-radius: 6px;
 }
 
 .post-item time {
@@ -300,5 +321,61 @@ summary:focus-visible {
 @media (max-width: 640px) {
   .toc {
     padding: 0.75rem 1rem;
+  }
+}
+
+/* 全站文章摘要由主题决定显示方式与数量。 */
+body.with-sidebar {
+  max-width: 1080px;
+}
+
+.with-sidebar .site-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 15rem;
+  align-items: start;
+  gap: 3rem;
+}
+
+.site-content {
+  min-width: 0;
+}
+
+.recent-posts {
+  padding-inline-start: 1.5rem;
+  border-inline-start: 1px solid var(--border);
+}
+
+.recent-posts h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.recent-posts ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent-posts li {
+  margin-block: 0 1rem;
+  overflow-wrap: anywhere;
+}
+
+.recent-posts time {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 900px) {
+  .with-sidebar .site-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+
+  .recent-posts {
+    padding: 1.5rem 0 0;
+    border-inline-start: 0;
+    border-block-start: 1px solid var(--border);
   }
 }

@@ -2,7 +2,7 @@
 
 #include "config/site.hpp"
 #include "parse/front_matter.hpp"
-#include "render/article.hpp"
+#include "render/content.hpp"
 
 #include <cstddef>
 #include <filesystem>
@@ -36,7 +36,8 @@ struct BuildPlan {
     std::string base_path{"/"};
     std::vector<PlannedPage> pages;
     std::vector<PlannedAsset> assets;
-    std::vector<ArticleSummary> articles;
+    std::vector<ContentSummary> articles;
+    std::vector<ContentSummary> independent_pages;
     std::vector<PlannedListing> listings;
     std::map<std::filesystem::path, std::filesystem::path> page_urls;
     std::set<std::filesystem::path> outputs;

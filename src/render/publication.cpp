@@ -59,7 +59,7 @@ std::string escape_xml(std::string_view text) {
 } // namespace
 
 std::string render_rss(SiteMetadata const& site, BaseUrl const& base,
-                       std::span<ArticleSummary const> articles) {
+                       std::span<ContentSummary const> articles) {
     auto const home = escape_xml(published_url(base, ""));
     auto const feed = escape_xml(published_url(base, "rss.xml"));
     std::string xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"

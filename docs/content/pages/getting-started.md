@@ -1,7 +1,7 @@
----
-title: 快速开始
-description: 创建一个可编辑、可预览、可发布的 Mizuki 站点。
----
++++
+title = "快速开始"
+description = "创建一个可编辑、可预览、可发布的 Mizuki 站点。"
++++
 
 Mizuki 把 Markdown、TOML 配置和主题模板构建为 HTML、CSS 与资源文件。本地预览时运行 Mizuki；发布后，服务器只需提供生成的静态文件。本文先完成一个博客，再说明本站文档的构建方式。
 
@@ -67,12 +67,12 @@ mizuki new posts/my-first-post.md --title "我的第一篇文章"
 打开生成文件，编辑元数据和正文：
 
 ```md
----
-title: 我的第一篇文章
-date: 2026-11-22
-description: 记录建站的第一步。
-draft: false
----
++++
+title = "我的第一篇文章"
+date = "2026-11-22"
+description = "记录建站的第一步。"
+draft = false
++++
 
 这是正文。
 
@@ -81,7 +81,18 @@ draft: false
 使用段落、列表、代码块和链接组织内容。
 ```
 
-front matter 是简单的单行键值格式，支持 `title`、`date`、`description`、`draft` 与 `layout`，不是完整 YAML。文章要求非空标题与有效的 `YYYY-MM-DD` 日期；独立页面可以省略日期。`draft: true` 的内容不发布，日期本身不承担定时发布功能。
+`init` 与 `new` 生成由 `+++` 包裹的 TOML front matter。内置字段为 `title`、`date`、`description`、`draft` 与 `layout`；自定义数据放在 `[extra]` 中，可使用数组与嵌套表。文章要求非空标题与有效的 `YYYY-MM-DD` 日期；日期可以使用带引号的字符串或 TOML 本地日期，独立页面可以省略日期。`draft = true` 的内容不发布，日期本身不承担定时发布功能。
+
+例如为当前页面关闭目录并设置封面图，在结束的 `+++` 前添加：
+
+```toml
+[extra]
+show_toc = false
+cover = "images/cover.webp"
+cover_alt = "山间的晨光"
+```
+
+图片放在 `content/images/cover.webp`。默认主题会在详情页、首页列表和归档中显示封面，并按部署路径生成图片地址。页面目录设置优先于站点 `[extra].show_toc`；更多数据用法见[主题开发](themes.md#页面自定义数据)。已有的 `---` 简单键值文稿仍可构建；需要数组、嵌套数据或 TOML 注释时，请将开头和结尾改为 `+++`，并把字段改写为 TOML。
 
 需要先写草稿时：
 
@@ -142,7 +153,9 @@ footer_text = "感谢阅读"
 
 配置中的目录相对配置文件解析。`paginate_by = 0` 关闭分页；`archives = true` 生成按年份分组的归档。导航必须指向已生成的本地页面或外部地址。
 
-`[extra]` 是主题参数。默认主题支持目录开关与页脚文字；自定义主题可以增加自己的参数，详见[主题开发](themes.md)。站点配置的未知根级字段会报错，主题自由参数应放在 `[extra]` 中。
+`[markdown]` 控制数学、脚注与提示块语法，代码、公式及其样式示例见[技术写作](writing.md)。
+
+`[extra]` 是主题参数。默认主题支持目录、代码高亮、复制、公式排版开关与页脚文字；自定义主题可以增加自己的参数，详见[主题开发](themes.md)。站点配置的未知根级字段会报错，主题自由参数应放在 `[extra]` 中。
 
 ## 构建与预览
 

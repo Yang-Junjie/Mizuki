@@ -38,7 +38,7 @@ nlohmann::json collection_context(SiteConfig const& config, BuildPlan const& pla
 std::string render_page(PlannedPage const& page, Theme& theme, SiteConfig const& config,
                         BuildPlan const& plan, nlohmann::json const& extra) {
     try {
-        auto const markdown = render_markdown(page.document.body);
+        auto const markdown = render_markdown(page.document.body, config.markdown);
         auto const html =
             rewrite_document_links(markdown.html, [&](std::string_view url, HtmlLinkKind kind) {
                 return resolve_link(url, page.relative, plan,
@@ -51,10 +51,16 @@ std::string render_page(PlannedPage const& page, Theme& theme, SiteConfig const&
         data["kind"] = page.kind == DocumentKind::Article ? "post" : "page";
         data["title"] = metadata.title;
         data["date"] = metadata.date;
+        data["extra"] = metadata.extra;
         data["description"] =
             metadata.description.empty() ? config.site.description : metadata.description;
         data["content"] = html;
         data["headings"] = heading_data(markdown.headings);
+        data["features"] = {{"code", markdown.features.code},
+                            {"math", markdown.features.math},
+                            {"footnotes", markdown.features.footnotes},
+                            {"admonitions", markdown.features.admonitions}};
+        data["code_languages"] = markdown.code_languages;
         context["toc"] = toc_data(markdown.headings);
         auto const layout = metadata.layout.empty()
                                 ? (page.kind == DocumentKind::Article ? "post.html" : "page.html")
@@ -71,7 +77,7 @@ std::string render_listing(SiteConfig const& config, BuildPlan const& plan, std:
     auto const& listing = plan.listings[index];
     auto const articles = std::span(plan.articles).subspan(listing.offset, listing.count);
     auto context = collection_context(config, plan, listing.output, extra);
-    context["posts"] = article_data(articles, listing.output);
+    context["posts"] = summary_data(articles, listing.output);
     context["page"]["title"] =
         index == 0 ? config.site.title
                    : config.site.title + " · 第 " + std::to_string(index + 1) + " 页";
@@ -100,7 +106,7 @@ std::string render_archives(SiteConfig const& config, BuildPlan const& plan, The
             ++count;
         }
         context["archives"].push_back(
-            {{"year", year}, {"posts", article_data(articles.first(count), output)}});
+            {{"year", year}, {"posts", summary_data(articles.first(count), output)}});
         articles = articles.subspan(count);
     }
     return theme.render("archives.html", context);
@@ -111,7 +117,7 @@ std::string render_archives(SiteConfig const& config, BuildPlan const& plan, The
 BuildStats build_site(SiteConfig const& config) {
     auto const output_path = validate_output_path(config);
     auto const plan = plan_build(config);
-    Theme theme(config.theme_dir);
+    Theme theme(config.theme_dir, config.base_url.path);
     auto const extra = merge_extra(theme.defaults(), config.site.extra);
     OutputTransaction output(output_path);
     for (auto const& page : plan.pages) {

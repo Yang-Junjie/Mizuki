@@ -1,9 +1,14 @@
 #include "parse/front_matter.hpp"
 
+#include "config/values.hpp"
 #include "util/date.hpp"
 
+#include <toml++/toml.hpp>
+
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 
@@ -47,35 +52,17 @@ bool equals_ignore_case(std::string_view lhs, std::string_view rhs) {
     });
 }
 
-} // namespace
-
-Document parse_document(std::string_view source, DocumentKind kind) {
+FrontMatter parse_literal_metadata(std::string_view remaining) {
     FrontMatter metadata;
-
-    constexpr std::string_view bom = "\xEF\xBB\xBF";
-    if (source.starts_with(bom)) {
-        source.remove_prefix(bom.size());
-    }
-
-    auto remaining = source;
-    if (trim(next_line(remaining)) != "---") {
-        throw std::runtime_error("Missing front matter");
-    }
-
     bool has_title = false;
     bool has_date = false;
     bool has_draft = false;
     bool has_description = false;
     bool has_layout = false;
-    bool closed = false;
     std::string line_error;
 
     while (!remaining.empty()) {
         auto const line = trim(next_line(remaining));
-        if (line == "---") {
-            closed = true;
-            break;
-        }
         if (line.empty()) {
             continue;
         }
@@ -134,24 +121,111 @@ Document parse_document(std::string_view source, DocumentKind kind) {
         }
     }
 
-    if (!closed) {
-        throw std::runtime_error("Invalid front matter: missing closing '---'");
-    }
     if (!line_error.empty()) {
         throw std::runtime_error(std::move(line_error));
     }
-    if (!has_title || metadata.title.empty()) {
-        throw std::runtime_error("Invalid front matter: missing required key 'title'");
-    }
-    if ((kind == DocumentKind::Article && !has_date) || (has_date && metadata.date.empty())) {
+    if (has_date && metadata.date.empty()) {
         throw std::runtime_error("Invalid front matter: missing required key 'date'");
     }
+    return metadata;
+}
 
-    if (has_date) {
-        parse_date(metadata.date);
+std::string string_value(toml::node const& node, std::string_view key) {
+    if (!node.is_string()) {
+        throw std::runtime_error("Invalid front matter: '" + std::string(key) +
+                                 "' must be a string");
     }
+    return *node.value<std::string>();
+}
 
-    return {std::move(metadata), std::string(remaining)};
+FrontMatter parse_toml_metadata(std::string_view source) {
+    // The opening delimiter occupies line 1 in the source document.
+    toml::table table;
+    try {
+        table = toml::parse("\n" + std::string(source));
+    } catch (toml::parse_error const& error) {
+        std::ostringstream message;
+        message << error;
+        throw std::runtime_error(message.str());
+    }
+    FrontMatter metadata;
+    constexpr std::array<std::string_view, 6> keys{"title",  "date",  "description",
+                                                   "layout", "draft", "extra"};
+    for (auto const& [key, value] : table) {
+        auto const name = key.str();
+        if (std::ranges::find(keys, name) == keys.end()) {
+            throw std::runtime_error("Unknown front matter key: " + std::string(name) +
+                                     "; put custom data in [extra]");
+        }
+        if (name == "title") {
+            metadata.title = string_value(value, name);
+        } else if (name == "description") {
+            metadata.description = string_value(value, name);
+        } else if (name == "layout") {
+            metadata.layout = string_value(value, name);
+            if (trim(metadata.layout).empty()) {
+                throw std::runtime_error("Invalid front matter: 'layout' must be non-empty");
+            }
+        } else if (name == "date") {
+            if (auto const* date = value.as_date()) {
+                std::ostringstream formatted;
+                formatted << date->get();
+                metadata.date = formatted.str();
+            } else {
+                metadata.date = string_value(value, name);
+            }
+            if (metadata.date.empty()) {
+                throw std::runtime_error("Invalid front matter: 'date' must be non-empty");
+            }
+        } else if (name == "draft") {
+            if (!value.is_boolean()) {
+                throw std::runtime_error("Invalid front matter: 'draft' must be a boolean");
+            }
+            metadata.draft = *value.value<bool>();
+        } else if (name == "extra") {
+            if (!value.is_table()) {
+                throw std::runtime_error("Invalid front matter: 'extra' must be a table");
+            }
+            metadata.extra = template_value(value);
+        }
+    }
+    return metadata;
+}
+
+} // namespace
+
+Document parse_document(std::string_view source, DocumentKind kind) {
+    constexpr std::string_view bom = "\xEF\xBB\xBF";
+    if (source.starts_with(bom)) {
+        source.remove_prefix(bom.size());
+    }
+    auto remaining = source;
+    auto const delimiter = trim(next_line(remaining));
+    if (delimiter != "---" && delimiter != "+++") {
+        throw std::runtime_error("Missing front matter: expected '+++' or '---'");
+    }
+    auto const header = remaining;
+    while (!remaining.empty()) {
+        auto const before = remaining;
+        if (trim(next_line(remaining)) != delimiter) {
+            continue;
+        }
+        auto const fields = header.substr(0, header.size() - before.size());
+        auto metadata =
+            delimiter == "+++" ? parse_toml_metadata(fields) : parse_literal_metadata(fields);
+        if (trim(metadata.title).empty()) {
+            throw std::runtime_error("Invalid front matter: missing required key 'title'");
+        }
+        if (metadata.date.empty() && kind == DocumentKind::Article) {
+            throw std::runtime_error("Invalid front matter: missing required key 'date'");
+        }
+        if (!metadata.date.empty()) {
+            parse_date(metadata.date);
+        }
+        return {std::move(metadata), std::string(remaining)};
+    }
+    throw std::runtime_error("Invalid front matter: missing closing '" + std::string(delimiter) +
+                             "'");
 }
 
 } // namespace mizuki

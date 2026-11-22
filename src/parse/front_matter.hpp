@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
 #include <string>
 #include <string_view>
 
@@ -13,6 +14,7 @@ struct FrontMatter {
     std::string description;
     std::string layout;
     bool draft{false};
+    nlohmann::json extra = nlohmann::json::object();
 };
 
 struct Document {

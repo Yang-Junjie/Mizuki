@@ -2,15 +2,17 @@
 #pragma once
 
 #include <array>
+#include <span>
 #include <string_view>
 
 namespace mizuki {
 
 struct EmbeddedThemeFile {
     std::string_view path;
-    std::string_view content;
+    std::span<std::string_view const> chunks;
 };
 
+@MIZUKI_THEME_CONTENTS@
 inline constexpr std::array kEmbeddedTheme{
 @MIZUKI_THEME_FILES@};
 

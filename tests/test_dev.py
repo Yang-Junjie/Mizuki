@@ -153,7 +153,7 @@ class DevTests(BuilderFixture):
         css.write_text("body { color: red; }", encoding="utf-8")
         self.wait_for(lambda: self.disk_contains(self.output / "assets/css/style.css", "red"), "theme asset edit")
         layout = self.theme / "layouts/base.html"
-        layout.write_text(layout.read_text(encoding="utf-8").replace("<body>", "<body>Template edit"), encoding="utf-8")
+        layout.write_text(layout.read_text(encoding="utf-8").replace("</body>", "Template edit</body>"), encoding="utf-8")
         self.wait_for(lambda: self.disk_contains(renamed, "Template edit"), "layout edit")
         (self.content / "posts/renamed.md").unlink()
         self.wait_for(lambda: not renamed.exists(), "article deletion")
@@ -239,6 +239,22 @@ class DevTests(BuilderFixture):
         manifest.write_text(text.replace('footer_text = ""', 'footer_text = "Recovered theme"'), encoding="utf-8")
         self.wait_for(lambda: self.http_contains("/", "Recovered theme"), "theme recovery")
         self.assertGreater(self.version(), version)
+        self.assert_no_temporary_directories()
+
+    def test_markdown_syntax_and_reading_options_reload(self):
+        self.write_page("posts/first.md", "Writing", "$x^2$\n\n```cpp\nint x = 1;\n```\n")
+        self.start()
+        self.assertFalse(self.http_contains("/posts/first.html", "<x-equation>"))
+        self.configure('theme = "theme"\n[markdown]\nmath = true\n[extra]\ncode_copy = false\n')
+        self.wait_for(lambda: self.http_contains("/posts/first.html", "<x-equation>x^2</x-equation>"),
+                      "math syntax reload")
+        self.assertTrue(self.http_contains("/posts/first.html", 'data-copy="false"'))
+        self.assertTrue(self.http_contains("/posts/first.html", "vendor/katex/katex.min.js"))
+        self.configure('theme = "theme"\n[markdown]\nmath = false\n[extra]\ncode_highlight = false\ncode_copy = false\n')
+        self.wait_for(lambda: not self.http_contains("/posts/first.html", "vendor/katex/katex.min.js"),
+                      "math disable reload")
+        self.assertFalse(self.http_contains("/posts/first.html", "js/code.js"))
+        self.assertTrue(self.http_contains("/posts/first.html", "$x^2$"))
         self.assert_no_temporary_directories()
 
     def test_config_atomic_reload_invalid_delete_recreate_and_cli_precedence(self):

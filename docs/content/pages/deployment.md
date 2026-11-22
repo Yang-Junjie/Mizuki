@@ -1,7 +1,7 @@
----
-title: 部署指南
-description: 将 Mizuki 生成的静态网页部署到 GitHub Pages，正确处理域名与部署子路径。
----
++++
+title = "部署指南"
+description = "将 Mizuki 生成的静态网页部署到 GitHub Pages，正确处理域名与部署子路径。"
++++
 
 站点发布地址通过 `mizuki.toml` 的 `base_url` 设置，也可以使用 `--base-url` 临时覆盖。构建输出由静态文件组成，不需要在发布服务器上运行 Mizuki。
 
@@ -14,9 +14,9 @@ base_url = "https://example.com/blog/"
 ```
 
 ```sh
-./build/bin/mizuki serve
+mizuki serve
 # 打开 http://127.0.0.1:3939/blog/
-./build/bin/mizuki build
+mizuki build
 ```
 
 检查首页、深层文章、独立页面、图片和下载链接，然后把 `dist/` 中的内容发布到该地址。不要再将整个输出包入 `blog/` 目录。部署到域名根目录时使用 `https://example.com/` 或 `/`。
@@ -54,7 +54,7 @@ Mizuki 仓库已经提供实际使用的 [Pages 工作流](https://github.com/Ya
 
 工作流先编译 Mizuki，再通过 `actions/configure-pages` 取得实际 `base_url`，以 `--base-url` 传给构建命令，最后上传并发布 `dist/`。因此项目站点的仓库前缀、用户站点的根路径和已经配置的自定义域名都不需要在工作流里写死。生成的站点文件不包含本地预览刷新脚本。
 
-示例声明 `contents: read`、`pages: write` 和 `id-token: write`，并使用 `github-pages` 部署环境。博客示例仍保留在 `examples/` 中，复制到工作流目录并满足 Pages 设置后即可部署；本仓库自己的工作流则使用 `docs/mizuki.toml`。
+示例声明 `contents: read`、`pages: write` 和 `id-token: write`，并使用 `github-pages` 部署环境。博客部署的工作流模板位于 `examples/github-pages.yml`，需配合自己的站点配置与内容使用；本仓库自己的工作流使用 `docs/mizuki.toml`。
 
 如果内容仓库不包含 Mizuki 源码，需要先在自己的工作流中安装或编译 Mizuki，再使用相同的构建命令和 Pages 上传、部署步骤。
 

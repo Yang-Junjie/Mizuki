@@ -12,13 +12,13 @@
       <section class="guide-section" aria-labelledby="guides-title">
         <div class="section-heading"><h2 id="guides-title">选择你的起点</h2><span>从使用到实现</span></div>
         <div class="guide-grid">
-{% for item in navigation %}{% if not loop.is_first %}          <a class="guide-card" href="{{ item.url }}">
-            <span class="card-number">0{{ loop.index }}</span>
-            <h3>{{ item.title }} <span aria-hidden="true">↗</span></h3>
-{% if existsIn(site.extra.guide_descriptions, item.title) %}            <p>{{ at(site.extra.guide_descriptions, item.title) }}</p>
-{% endif %}
-          </a>
-{% endif %}{% endfor %}        </div>
+{% for guide in site.pages %}          <a class="guide-card" href="{{ guide.url }}">
+            <span class="card-number">{% if loop.index1 < 10 %}0{% endif %}{{ loop.index1 }}</span>
+            <h3>{{ guide.title }} <span aria-hidden="true">↗</span></h3>
+{% if existsIn(site.extra.guide_descriptions, guide.title) %}            <p>{{ at(site.extra.guide_descriptions, guide.title) }}</p>
+{% else if guide.description != "" %}            <p>{{ guide.description }}</p>
+{% endif %}          </a>
+{% endfor %}        </div>
       </section>
       <section class="home-example" aria-labelledby="example-title">
         <div><p class="eyebrow">A SMALL START</p><h2 id="example-title">三个命令，<br>开始写作。</h2><p>主题可以完全修改。<br>发布后只需要静态文件托管。</p></div>

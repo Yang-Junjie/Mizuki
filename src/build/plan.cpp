@@ -112,18 +112,19 @@ BuildPlan plan_build(SiteConfig const& options) {
         }
     }
     for (auto const& page : plan.pages) {
-        if (page.kind == DocumentKind::Article) {
-            auto const& metadata = page.document.metadata;
-            plan.articles.push_back(
-                {metadata.title, metadata.date, path_to_utf8(page.output), metadata.description});
-        }
+        auto const& metadata = page.document.metadata;
+        auto& summaries =
+            page.kind == DocumentKind::Article ? plan.articles : plan.independent_pages;
+        summaries.push_back({metadata.title, metadata.date, path_to_utf8(page.output),
+                             metadata.description, metadata.extra});
     }
-    std::ranges::sort(plan.articles, [](ArticleSummary const& left, ArticleSummary const& right) {
+    std::ranges::sort(plan.articles, [](ContentSummary const& left, ContentSummary const& right) {
         if (left.date != right.date) {
             return left.date > right.date;
         }
         return left.url < right.url;
     });
+    std::ranges::sort(plan.independent_pages, {}, &ContentSummary::url);
     auto const total = plan.articles.size();
     auto const page_count = total == 0 || options.paginate_by == 0
                                 ? std::size_t{1}

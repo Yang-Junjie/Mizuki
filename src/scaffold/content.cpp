@@ -6,7 +6,10 @@
 #include "util/date.hpp"
 #include "util/path.hpp"
 
+#include <toml++/toml.hpp>
+
 #include <algorithm>
+#include <sstream>
 #include <stdexcept>
 #include <string_view>
 
@@ -63,10 +66,15 @@ fs::path create_content(SiteConfig const& config, NewContent const& content) {
     validate_text(content.title, "Title", true);
     validate_text(content.description, "Description", false);
     auto const path = content_path(config, content.path);
-    // Front matter is literal single-line text: quotes inside a value are not escapes.
-    auto source = "---\ntitle: \"" + content.title + "\"\ndate: " + local_date() +
-                  "\ndescription: \"" + content.description +
-                  "\"\ndraft: " + (content.draft ? "true" : "false") + "\n---\n\n";
+    toml::table metadata{{"title", content.title},
+                         {"date", local_date()},
+                         {"description", content.description},
+                         {"draft", content.draft}};
+    std::ostringstream document;
+    document << "+++\n"
+             << toml::toml_formatter{metadata, toml::format_flags::allow_unicode_strings}
+             << "\n+++\n\n";
+    auto const source = document.str();
     parse_document(source, DocumentKind::Article);
     FileCreation files;
     files.write(path, source);

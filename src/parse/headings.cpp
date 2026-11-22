@@ -317,20 +317,69 @@ bool heading(Tag const& tag) {
 
 } // namespace
 
-RenderedMarkdown add_heading_anchors(std::string_view html) {
+RenderedMarkdown analyze_markdown_html(std::string_view html) {
     auto const tags = scan_tags(html);
+    RenderedMarkdown result;
+    unsigned pre_depth = 0;
+    unsigned code_depth = 0;
+    std::unordered_set<std::string> languages;
     std::unordered_set<std::string> used_ids;
     for (auto const& tag : tags) {
+        if (tag.name == "pre") {
+            if (!tag.closing) {
+                ++pre_depth;
+                result.features.code = true;
+            } else if (pre_depth) {
+                --pre_depth;
+            }
+        }
         if (!tag.closing) {
             if (auto const id = attribute(html, tag, "id")) {
                 used_ids.insert(decode_text(id->value));
             }
+            if (auto const classes = attribute(html, tag, "class")) {
+                auto const decoded = decode_text(classes->value);
+                std::string_view rest = decoded;
+                while (!rest.empty()) {
+                    auto const start = rest.find_first_not_of(" \t\r\n\f");
+                    if (start == std::string_view::npos) {
+                        break;
+                    }
+                    rest.remove_prefix(start);
+                    auto const end = rest.find_first_of(" \t\r\n\f");
+                    auto const name = rest.substr(0, end);
+                    if (pre_depth && tag.name == "code" && name.starts_with("language-")) {
+                        auto language = std::string(name.substr(9));
+                        if (!language.empty() && languages.insert(language).second) {
+                            result.code_languages.push_back(std::move(language));
+                        }
+                    }
+                    if (!pre_depth && !code_depth) {
+                        result.features.footnotes |= tag.name == "section" && name == "footnotes";
+                        result.features.admonitions |=
+                            tag.name == "div" && name.starts_with("admonition-");
+                    }
+                    if (end == std::string_view::npos) {
+                        break;
+                    }
+                    rest.remove_prefix(end);
+                }
+            }
+            if (!pre_depth && !code_depth && tag.name == "x-equation") {
+                result.features.math = true;
+            }
+        }
+        if (tag.name == "code") {
+            if (!tag.closing) {
+                ++code_depth;
+            } else if (code_depth) {
+                --code_depth;
+            }
         }
     }
-    RenderedMarkdown result;
     std::unordered_map<std::string, unsigned> next_suffix;
     std::size_t offset = 0;
-    unsigned code_depth = 0;
+    code_depth = 0;
     for (std::size_t i = 0; i < tags.size(); ++i) {
         auto const& tag = tags[i];
         if (tag.name == "pre" || tag.name == "code") {

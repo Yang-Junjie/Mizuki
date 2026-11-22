@@ -3,6 +3,7 @@
 #include "config/values.hpp"
 #include "util/file.hpp"
 #include "util/path.hpp"
+#include "util/url.hpp"
 
 #include <toml++/toml.hpp>
 
@@ -25,7 +26,8 @@ struct Theme::Impl {
     std::vector<fs::path> loading;
     std::ostream* output{nullptr};
 
-    explicit Impl(fs::path const& directory) : root(fs::weakly_canonical(directory / "layouts")) {
+    explicit Impl(fs::path const& directory, std::string base_path)
+        : root(fs::weakly_canonical(directory / "layouts")) {
         auto const manifest = directory / "theme.toml";
         if (fs::exists(manifest)) {
             try {
@@ -57,6 +59,32 @@ struct Theme::Impl {
                                          error.what());
             }
         }
+        environment.add_callback("url", 1, [base = std::move(base_path)](inja::Arguments& args) {
+            if (!args.front()->is_string()) {
+                throw std::runtime_error("url() requires a string");
+            }
+            auto const& url = args.front()->get_ref<std::string const&>();
+            if (url.empty() || has_url_scheme(url) || url.starts_with("//") ||
+                url.starts_with('#') || url.starts_with('?')) {
+                return url;
+            }
+            auto const separator = url.find_first_of("?#");
+            auto const raw_path = std::string_view(url).substr(0, separator);
+            auto const decoded = decode_url_path(raw_path);
+            if (decoded.starts_with("//") || decoded.find_first_of("\\:") != std::string::npos ||
+                decoded.find('\0') != std::string::npos) {
+                throw std::runtime_error("url() requires a path inside the site: " + url);
+            }
+            auto const path = path_from_utf8(decoded).relative_path().lexically_normal();
+            if (std::ranges::find(path, fs::path("..")) != path.end()) {
+                throw std::runtime_error("url() path escapes the site: " + url);
+            }
+            auto const suffix =
+                separator == std::string::npos ? std::string{} : url.substr(separator);
+            return base +
+                   (path == fs::path(".") ? std::string{} : encode_url_path(path_to_utf8(path))) +
+                   suffix;
+        });
         environment.set_html_autoescape(true);
         environment.set_search_included_templates_in_files(false);
         environment.set_include_callback(
@@ -121,7 +149,8 @@ struct Theme::Impl {
     }
 };
 
-Theme::Theme(fs::path directory) : impl_(std::make_unique<Impl>(directory)) {}
+Theme::Theme(fs::path directory, std::string base_path)
+    : impl_(std::make_unique<Impl>(directory, std::move(base_path))) {}
 Theme::~Theme() = default;
 
 nlohmann::json const& Theme::defaults() const {

@@ -9,6 +9,9 @@ install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" "${PROJECT_SOURCE_DIR}/README.md"
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/docs/"
     DESTINATION "${distribution_docs}/docs" COMPONENT mizuki)
 
+install(DIRECTORY "${PROJECT_SOURCE_DIR}/examples/"
+    DESTINATION "${distribution_docs}/examples" COMPONENT mizuki)
+
 set(CPACK_SOURCE_INSTALLED_DIRECTORIES "${PROJECT_SOURCE_DIR};/")
 foreach(dependency spdlog md4c efsw httplib tomlplusplus json inja)
     FetchContent_GetProperties(${dependency} SOURCE_DIR dependency_source)

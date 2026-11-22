@@ -162,17 +162,18 @@ class ScaffoldTests(unittest.TestCase):
         self.command("new", "posts/第一篇.md", "--title", "第一篇文章", cwd=site)
         after = datetime.now().date().isoformat()
         source = (site / "content/posts/第一篇.md").read_text(encoding="utf-8")
-        date_line = next(line for line in source.splitlines() if line.startswith("date: "))
-        self.assertIn(date_line[6:], (before, after))
-        self.assertIn("draft: false\n", source)
-        self.assertIn('description: ""\n', source)
+        self.assertTrue(source.startswith("+++\n"))
+        date_line = next(line for line in source.splitlines() if line.startswith("date = "))
+        self.assertIn(date_line[8:-1], (before, after))
+        self.assertIn("draft = false\n", source)
+        self.assertIn('description = ""\n', source)
         self.command("build", cwd=site)
         self.assertIn("第一篇文章", (site / "dist/index.html").read_text(encoding="utf-8"))
         self.assertTrue((site / "dist/posts/第一篇.html").is_file())
 
     def test_new_round_trips_quotes_backslashes_and_spaces(self):
         site = self.init()
-        titles = ('中文: # "double" and \'single\' \\ end', '"quoted"', "'quoted'", "  spaced title  ")
+        titles = ('中文: # "double" and \'single\' \\ end', '"quoted"', "'quoted'", "  spaced title  ", "title\twith tab", "+++")
         description = '摘要: "引号" \\ <tag> & \'single\''
         for index, title in enumerate(titles):
             self.command("new", f"posts/quotes-{index}.md", "--title", title,
@@ -186,7 +187,7 @@ class ScaffoldTests(unittest.TestCase):
     def test_new_draft_is_excluded_from_build_and_archive(self):
         site = self.init()
         self.command("new", "posts/hidden.md", "--title", "Hidden draft", "--draft", cwd=site)
-        self.assertIn("draft: true", (site / "content/posts/hidden.md").read_text())
+        self.assertIn("draft = true\n", (site / "content/posts/hidden.md").read_text())
         self.command("build", cwd=site)
         self.assertFalse((site / "dist/posts/hidden.html").exists())
         for name in ("index.html", "archives/index.html"):

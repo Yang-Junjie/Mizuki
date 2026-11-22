@@ -6,7 +6,7 @@ FetchContent_Declare(
     GIT_TAG        v0.6.0
     GIT_SHALLOW    TRUE
     GIT_PROGRESS   TRUE
-    FIND_PACKAGE_ARGS
+    FIND_PACKAGE_ARGS 0.6
 )
 
 FetchContent_MakeAvailable(md4c)

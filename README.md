@@ -2,7 +2,7 @@
 
 一个用 C++ 编写的轻量静态博客框架，支持站点初始化、文章创建、Markdown 文章、独立页面、TOML 站点配置、本地预览和自动刷新。
 
-[在线文档](https://blog.cglab.top/Mizuki/)使用 Mizuki 自身构建，包含[快速开始](docs/content/pages/getting-started.md)、[主题开发](docs/content/pages/themes.md)、[架构设计](docs/content/pages/architecture.md)与[部署指南](docs/content/pages/deployment.md)。本地预览方法见 [docs/README.md](docs/README.md)。
+[在线文档](https://blog.cglab.top/Mizuki/)使用 Mizuki 自身构建，包含[快速开始](docs/content/pages/getting-started.md)、[技术写作](docs/content/pages/writing.md)、[主题开发](docs/content/pages/themes.md)、[架构设计](docs/content/pages/architecture.md)与[部署指南](docs/content/pages/deployment.md)。本地预览方法见 [docs/README.md](docs/README.md)。
 
 ## 下载与快速开始
 
@@ -47,7 +47,7 @@ mizuki serve
 
 目标目录必须不存在或为空；`mizuki init .` 可在空的当前目录初始化。非空目录（包括隐藏文件）、普通文件和指向目标目录的符号链接都会被拒绝，已有文件不覆盖。嵌套目录可以自动创建；操作失败时清理本次创建的文件和目录，保留已有目录及其他文件。
 
-`new` 的路径相对于配置中的内容目录，无需再写 `content/` 前缀；父目录自动创建。`--title` 必填，`--description` 可选，均为单行纯文本，保留引号、反斜杠及首尾空白，拒绝空白标题、换行、NUL 等无效字符。生成的 front matter 符合 Mizuki 的简单字面值规则，不按 YAML 转义。日期使用创建时的本地日期 `YYYY-MM-DD`，之后可以自行编辑。
+`new` 的路径相对于配置中的内容目录，无需再写 `content/` 前缀；父目录自动创建。`--title` 必填，`--description` 可选，均为单行纯文本，保留引号、反斜杠及首尾空白，拒绝空白标题、换行、NUL 等无效字符。生成的 front matter 使用 `+++` 包裹的 TOML，由 toml++ 正确处理引号与转义。日期使用创建时的本地日期 `YYYY-MM-DD`，之后可以自行编辑。
 
 ```sh
 mizuki new posts/another.md --title "另一篇文章" --description "文章摘要"
@@ -57,13 +57,13 @@ mizuki new notes/first.md --title "笔记" --config sites/blog.toml
 mizuki new posts/first.md --title "指定内容目录" --content manuscripts
 ```
 
-默认生成 `draft: false`，可以立即出现在预览中；`--draft` 生成草稿，`build`、`watch` 和 `serve` 都跳过它。`pages/` 下的文稿沿用独立页面规则，不进入文章列表。`new` 支持 `--config` 和 `--content`，路径基准与构建命令一致。
+默认生成 `draft = false`，可以立即出现在预览中；`--draft` 生成草稿，`build`、`watch` 和 `serve` 都跳过它。`pages/` 下的文稿沿用独立页面规则，不进入文章列表。`new` 支持 `--config` 和 `--content`，路径基准与构建命令一致。
 
 新文件必须使用 `.md` 扩展名，路径不能是绝对路径、包含 `..` 或经过内容目录内的符号链接，顶层 `index.md` 保留给自动生成的首页。已有文件、目录和悬空符号链接均不会被替换。以 `-` 开头的路径可以放在 `--` 后，例如 `mizuki new --title "文章" -- -post.md`。运行 `mizuki init --help` 或 `mizuki new --help` 可查看对应参数。
 
 ## 站点配置
 
-默认读取当前工作目录的 `mizuki.toml`，文件不存在时沿用内置默认值。仓库自带可直接运行的配置：
+默认读取当前工作目录的 `mizuki.toml`，文件不存在时沿用内置默认值。下面是一个博客站点的配置示例：
 
 ```toml
 title = "Mizuki"
@@ -95,10 +95,10 @@ url = "/archives/"
 `build`、`watch` 和 `serve` 支持指定配置及目录；`new` 支持其中的 `--config` 和 `--content`：
 
 ```sh
-./build/bin/mizuki build --config sites/blog.toml
-./build/bin/mizuki serve --config sites/blog.toml --output preview
-./build/bin/mizuki watch --content content --theme themes/default --output dist
-./build/bin/mizuki build --base-url https://example.com/blog/
+mizuki build --config sites/blog.toml
+mizuki serve --config sites/blog.toml --output preview
+mizuki watch --content content --theme themes/default --output dist
+mizuki build --base-url https://example.com/blog/
 ```
 
 优先级为 **命令行 > 配置文件 > 内置默认值**，参数先后顺序不影响优先级。配置文件中的相对目录，以及已存在配置文件中省略的目录默认值，都以配置文件所在目录为基准；命令行相对路径和 `--config` 路径以当前工作目录为基准。显式指定的 `--config` 文件不存在时会报错。
@@ -135,6 +135,12 @@ query 和 fragment 保留；外部地址、`//` 地址、纯锚点保持原样�
 
 完整的 GitHub Pages 配置和工作流示例见 [部署指南](docs/content/pages/deployment.md)。
 
+## 主题开发
+
+主题用 Inja 模板、CSS 和可选 JavaScript 控制页面。所有模板都能通过 `site.posts` 与 `site.pages` 获取全站已发布文章和独立页面摘要，通过 `page` 获取当前页和正文；首页的根级 `posts` 只包含当前分页。摘要保留文稿自己的 `extra` 自定义数据，链接已适配当前页面深度与部署路径。
+
+默认主题展示目录、封面、最近文章和可选阅读组件；[`examples/minimal-theme/`](examples/minimal-theme/) 提供少量代码即可使用的起点。完整字段、参数与布局示例见[主题开发指南](docs/content/pages/themes.md)。开发自己的页面结构和内容组合不需要修改 C++。
+
 ## 内容与独立页面
 
 ```text
@@ -146,26 +152,41 @@ content/
   index.md                 -> 忽略，首页由主题生成
 ```
 
-每个待处理的 Markdown 文件必须以 `---` 包裹的 front matter 开头：
+每个待处理的 Markdown 文件必须以 front matter 开头。`init` 与 `new` 生成 `+++` 包裹的 TOML：
 
-```md
----
-title: 第一篇文章
-date: 2026-11-15
-description: 一段用于页面描述和 RSS 摘要的介绍。
-draft: false
----
+```toml
++++
+title = "第一篇文章"
+date = "2026-11-22"
+description = "一段用于页面描述和 RSS 摘要的介绍。"
+draft = false
 
-正文……
+[extra]
+cover = "images/cover.webp"
+cover_alt = "文章封面"
+show_toc = false
+labels = ["C++", "图形学"]
+
+[extra.author]
+name = "Artichoke"
++++
 ```
 
-- `title` 必填且不能为空。
-- 普通文章必须有有效的 `date`，严格使用 `YYYY-MM-DD`，年份为 0001–9999，并校验闰年与每月天数。首页、归档与 RSS 按日期降序排列，相同日期按输出 URL 排序。未来日期仍会发布，不做定时发布处理。原先使用任意日期文本的文章需要先改为此格式。
+结束的 `+++` 后是 Markdown 正文。内置字段规则如下：
+
+- `title` 必填且必须为非空字符串。
+- 普通文章必须有有效的 `date`，使用 `YYYY-MM-DD` 字符串或 TOML 本地日期，年份为 0001–9999，并校验闰年与每月天数。首页、归档与 RSS 按日期降序排列，相同日期按输出 URL 排序。未来日期仍会发布，不做定时发布处理。
 - 内容根目录下 `pages/` 内的 Markdown 是独立页面，使用 `layouts/page.html`，允许省略 `date`；若提供日期则使用同一套格式与日历校验。独立页面不进入首页文章列表，可以加入导航。
-- `description` 是可选的单行纯文本，可用成对的单引号或双引号包裹。默认主题用它作为页面的 meta description，省略或为空时回退到站点 `description`；RSS 仅在文章自身有描述时输出摘要，不从正文自动截取。
-- `layout: special/project.html` 可为文章或独立页面选择主题 `layouts/` 下的模板，省略时分别使用 `post.html` 或 `page.html`。
-- `draft: true` 跳过页面，不生成 HTML，不占用输出路径。草稿仍需有合法的 front matter。
-- 键名重复、缺少结束 `---` 或格式错误会导致构建失败。Front matter 只支持简单 `key: value` 行，不支持 YAML 注释、列表或嵌套结构；站点配置单独使用 TOML。
+- `description` 是可选字符串。默认主题用它作为页面的 meta description，省略或为空时回退到站点 `description`；RSS 仅在文章自身有描述时输出摘要，不从正文自动截取。
+- `layout = "special/project.html"` 可为文章或独立页面选择主题 `layouts/` 下的模板，省略时分别使用 `post.html` 或 `page.html`。
+- `draft = true` 跳过页面，不生成 HTML，不占用输出路径。草稿仍需有合法的 front matter。
+- TOML 根级只允许上述字段与 `extra`；未知键、重复键、字段类型错误和格式错误会中止构建，并保留上次成功输出。
+
+`[extra]` 支持字符串、布尔值、有限数值、数组、嵌套表与表数组，供模板通过 `page.extra` 读取。首页分页的 `post.extra` 与归档中的文章摘要保留相同数据。未设置时为空对象，页面数据不与 `site.extra` 隐式合并；模板可用 `default(page.extra.show_toc, site.extra.show_toc)` 定义回退。
+
+默认主题通过页面 `show_toc` 覆盖站点目录开关，并在详情页、首页列表与归档显示 `cover`。封面路径从站点根目录解析，例如图片放在 `content/images/cover.webp`，写 `cover = "images/cover.webp"`；也支持外部图片 URL。`url(page.extra.cover)` 负责 URL 编码与部署子路径，`cover_alt` 是可选说明。
+
+已有的 `---` 简单 `key: value` 文稿继续支持；它不是完整 YAML，不支持列表或嵌套数据。需要自定义参数时改用 TOML，详见[主题开发指南](docs/content/pages/themes.md)。
 
 ### 导航与文内链接
 
@@ -211,6 +232,26 @@ ID 仅在当前页面内分配，相同输入重复构建得到相同结果。�
 自定义主题通过 `toc` 标题树与 `page.headings` 数组自行组织目录，也可使用默认主题的 `{% include "partials/toc.html" %}`。默认目录使用原生 `<details open>`，默认展开，可用鼠标或键盘折叠，关闭 JavaScript 仍能跳转。可通过 `.toc` 和 `.heading-anchor` 调整样式，或在站点 `[extra]` 中设置 `show_toc = false` 隐藏目录。
 
 原样复制的 HTML 文件不参与此处理。站内 Markdown 链接继续只检查目标页面是否发布，不检查 fragment 是否存在。
+
+## 代码高亮、数学公式与脚注
+
+默认主题提供本地 highlight.js 代码高亮、复制按钮和 KaTeX 公式排版，脚注与 GFM 提示块使用静态 HTML。脚本、字体与许可证随主题提供，`init` 创建的站点可离线使用；代码与公式资源按页面内容引用。
+
+```toml
+[markdown]
+math = true
+footnotes = true
+admonitions = true
+
+[extra]
+code_highlight = true
+code_copy = true
+math_render = true
+```
+
+数学语法默认关闭，脚注与提示块默认开启；新初始化站点显式开启三项。代码围栏标注 `cpp`、`python`、`toml`、`cmake` 等语言，无语言或未知语言保留普通代码。公式使用 `$...$` 与 `$$...$$`，启用后金额写成 `\$5`；代码内的美元符号不受影响。无效公式或关闭 JavaScript 时保留原文，脚注跳转仍可用。
+
+主题可使用 `page.features` 与 `page.code_languages` 自行控制资源，也可修改 `reading.css` 中的代码颜色、字号、公式和脚注样式。详细语法、示例和自定义方式见[技术写作](docs/content/pages/writing.md)与[主题开发](docs/content/pages/themes.md)。
 
 ## RSS、sitemap 与规范地址
 
@@ -289,7 +330,7 @@ show_toc = false
 footer_text = "我的博客"
 ```
 
-在文档 front matter 中设置 `layout: special/project.html`，即可选择该主题 `layouts/` 下的专用布局。主题 `assets/` 中的文件复制到输出 `assets/`，内容目录的非 Markdown 文件按相对路径复制。主题配置、布局和组件变化都会触发预览重建。
+在文档 TOML front matter 中设置 `layout = "special/project.html"`，即可选择该主题 `layouts/` 下的专用布局。主题 `assets/` 中的文件复制到输出 `assets/`，内容目录的非 Markdown 文件按相对路径复制。主题配置、布局和组件变化都会触发预览重建。
 
 ## 路径冲突与输出管理
 
@@ -323,16 +364,16 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
 cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 
-# 在项目根目录构建、持续构建，或启动预览
-./build/bin/mizuki build
-./build/bin/mizuki watch
-./build/bin/mizuki serve
-./build/bin/mizuki serve --port 4000
+# 在项目根目录构建文档站、持续构建，或启动预览
+./build/bin/mizuki build --config docs/mizuki.toml
+./build/bin/mizuki watch --config docs/mizuki.toml
+./build/bin/mizuki serve --config docs/mizuki.toml
+./build/bin/mizuki serve --config docs/mizuki.toml --port 4000
 ```
 
-默认预览地址是 `http://127.0.0.1:3939`，按 Ctrl+C 退出。`--port` 仅用于 `serve`，范围为 1–65535；端口占用会报错退出。
+仓库以 `docs/` 文档站作为实际示例和功能验证入口，输出位于 `build/docs/`。默认预览地址是 `http://127.0.0.1:3939`，按 Ctrl+C 退出。`--port` 仅用于 `serve`，范围为 1–65535；端口占用会报错退出。
 
-CMake 使用 spdlog、md4c、efsw、cpp-httplib、toml++、Inja 和 nlohmann/json。依赖版本在 `cmake/third_party_*.cmake` 中固定；可用的 spdlog、md4c 和 toml++ 安装包会优先被查找，其余通过 FetchContent 下载，首次配置需要网络。加入 `-DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER` 可全部使用项目固定的源码依赖。不需要测试时可设 `-DBUILD_TESTING=OFF`，无需 Python。
+CMake 使用 spdlog、md4c、efsw、cpp-httplib、toml++、Inja 和 nlohmann/json。依赖版本在 `cmake/third_party_*.cmake` 中固定；可用的 spdlog、MD4C 0.6+ 和 toml++ 安装包会优先被查找，其余通过 FetchContent 下载，首次配置需要网络。加入 `-DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER` 可全部使用项目固定的源码依赖。不需要测试时可设 `-DBUILD_TESTING=OFF`，无需 Python。
 
 Linux 安装 Ninja 后，也可使用 `linux-debug` / `linux-release` presets：
 
@@ -340,7 +381,7 @@ Linux 安装 Ninja 后，也可使用 `linux-debug` / `linux-release` presets：
 cmake --preset linux-debug
 cmake --build --preset linux-debug
 ctest --preset linux-debug
-./build/linux-debug/bin/mizuki serve
+./build/linux-debug/bin/mizuki serve --config docs/mizuki.toml
 ```
 
 Windows 可在 MSVC 开发者终端中使用 Ninja 编译，运行 `build\bin\mizuki.exe`；使用 Visual Studio 多配置生成器时，需带 `--config Release` / `ctest -C Release`，程序位于 `build\bin\Release\mizuki.exe`。原有 MSVC、ClangCL presets 保留，其工具链需与本机安装匹配。GitHub Actions 使用 Linux GCC 和 Windows MSVC + Ninja 构建并运行完整测试；具体平台是否通过以工作流结果为准。

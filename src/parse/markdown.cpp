@@ -27,17 +27,27 @@ Document read_document(std::filesystem::path const& path, DocumentKind kind) {
     }
 }
 
-RenderedMarkdown render_markdown(std::string_view body) {
+RenderedMarkdown render_markdown(std::string_view body, MarkdownOptions const& options) {
     if (body.size() > std::numeric_limits<MD_SIZE>::max()) {
         throw std::runtime_error("Markdown document exceeds parser size limit");
     }
+    unsigned flags = MD_DIALECT_GITHUB;
+    if (options.math) {
+        flags |= MD_FLAG_LATEXMATHSPANS;
+    }
+    if (!options.footnotes) {
+        flags &= ~MD_FLAG_FOOTNOTES;
+    }
+    if (!options.admonitions) {
+        flags &= ~MD_FLAG_ADMONITIONS;
+    }
     std::string html;
-    auto const result = md_html(body.data(), static_cast<MD_SIZE>(body.size()), append_html, &html,
-                                MD_DIALECT_GITHUB, 0);
+    auto const result =
+        md_html(body.data(), static_cast<MD_SIZE>(body.size()), append_html, &html, flags, 0);
     if (result != 0) {
         throw std::runtime_error("Failed to convert Markdown");
     }
-    return add_heading_anchors(html);
+    return analyze_markdown_html(html);
 }
 
 } // namespace mizuki

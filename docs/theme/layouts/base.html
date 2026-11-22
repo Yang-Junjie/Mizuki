@@ -9,6 +9,8 @@
   <title>{{ page.title }}{% if page.kind != "home" %} · {{ site.title }}{% endif %}</title>
 {% if page.canonical_url != "" %}  <link rel="canonical" href="{{ page.canonical_url }}">
 {% endif %}  <link rel="stylesheet" href="{{ asset_base }}css/docs.css">
+{% include "partials/reading.html" %}
+  {% block head %}{% endblock %}
 </head>
 <body>
   <a class="skip-link" href="#main">跳到正文</a>

@@ -8,7 +8,7 @@
       <div class="document-grid">
         {% include "partials/toc.html" %}
         <article class="document" aria-labelledby="document-title">
-          <div class="prose">{{ html(page.content) }}</div>
+          <div class="prose" data-markdown>{{ html(page.content) }}</div>
         </article>
       </div>
 {% endblock %}

@@ -11,7 +11,7 @@ namespace mizuki {
 
 nlohmann::json page_context(SiteConfig const& config, BuildPlan const& plan,
                             std::filesystem::path const& output, nlohmann::json const& extra);
-nlohmann::json article_data(std::span<ArticleSummary const> articles,
+nlohmann::json summary_data(std::span<ContentSummary const> summaries,
                             std::filesystem::path const& output);
 nlohmann::json heading_data(std::span<Heading const> headings);
 nlohmann::json toc_data(std::span<Heading const> headings);

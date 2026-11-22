@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config/markdown.hpp"
 #include "parse/front_matter.hpp"
 
 #include <filesystem>
@@ -17,11 +18,20 @@ struct Heading {
     std::string text;
 };
 
+struct MarkdownFeatures {
+    bool code{false};
+    bool math{false};
+    bool footnotes{false};
+    bool admonitions{false};
+};
+
 struct RenderedMarkdown {
     std::string html;
     std::vector<Heading> headings;
+    MarkdownFeatures features;
+    std::vector<std::string> code_languages;
 };
 
-RenderedMarkdown render_markdown(std::string_view body);
+RenderedMarkdown render_markdown(std::string_view body, MarkdownOptions const& options = {});
 
 } // namespace mizuki

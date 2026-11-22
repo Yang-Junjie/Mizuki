@@ -3,6 +3,8 @@
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlsplit
+import json
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -16,6 +18,7 @@ class Page(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.ids = []
         self.links = []
+        self.guide_links = []
         self.current = []
         self.canonical = []
         self.text = []
@@ -26,6 +29,8 @@ class Page(HTMLParser):
         attributes = dict(attributes)
         if "id" in attributes:
             self.ids.append(attributes["id"])
+        if tag == "a" and attributes.get("class") == "guide-card":
+            self.guide_links.append(attributes["href"])
         if attributes.get("aria-current") == "page":
             self.current.append(attributes.get("href"))
         if tag == "link" and attributes.get("rel") == "canonical":
@@ -43,6 +48,7 @@ class DocumentationTest(unittest.TestCase):
         "index.html",
         "pages/getting-started.html",
         "pages/themes.html",
+        "pages/writing.html",
         "pages/architecture.html",
         "pages/deployment.html",
     }
@@ -53,10 +59,10 @@ class DocumentationTest(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
 
-    def build(self, base_url):
+    def build(self, base_url, *, config=None):
         output = self.root / "site"
         result = subprocess.run(
-            [str(self.binary), "build", "--config", str(PROJECT_ROOT / "docs/mizuki.toml"),
+            [str(self.binary), "build", "--config", str(config or PROJECT_ROOT / "docs/mizuki.toml"),
              "--base-url", base_url, "--output", str(output)],
             cwd=self.root, capture_output=True, text=True, encoding="utf-8", timeout=30,
         )
@@ -69,6 +75,8 @@ class DocumentationTest(unittest.TestCase):
             for path in output.rglob("*.html")
         }
         self.assertEqual(set(pages), self.expected_pages)
+        self.assertEqual(pages["index.html"].guide_links,
+                         sorted(self.expected_pages - {"index.html"}))
         origin = urlsplit(base_url)
         prefix = unquote(origin.path)
         expected_canonicals = set()
@@ -104,7 +112,10 @@ class DocumentationTest(unittest.TestCase):
         self.assertTrue((output / "assets/css/docs.css").is_file())
         self.assertEqual(
             {path.relative_to(output).as_posix() for path in output.rglob("*") if path.is_file()},
-            self.expected_pages | {"assets/css/docs.css", "rss.xml", "sitemap.xml"},
+            self.expected_pages | {"rss.xml", "sitemap.xml"} | {
+                "assets/" + path.relative_to(PROJECT_ROOT / "docs/theme/assets").as_posix()
+                for path in (PROJECT_ROOT / "docs/theme/assets").rglob("*") if path.is_file()
+            },
         )
         theme_text = "".join(pages["pages/themes.html"].text)
         self.assertIn("{{ html(page.content) }}", theme_text)
@@ -116,6 +127,35 @@ class DocumentationTest(unittest.TestCase):
                          "https://docs.example.test/%E6%96%87%E6%A1%A3%20%E7%AB%99/"):
             with self.subTest(base_url=base_url):
                 self.check_site(self.build(base_url), base_url)
+
+    def test_new_documents_automatically_become_home_entries_without_navigation_changes(self):
+        content = self.root / "content"
+        shutil.copytree(PROJECT_ROOT / "docs/content", content)
+        target = content / "pages/deep/新增 guide.md"
+        target.parent.mkdir()
+        target.write_text("+++\ntitle = '<New & guide>'\n"
+                          'description = "Own description <&>"\n+++\n\n'
+                          '[Themes](../themes.md)\n', encoding="utf-8")
+        (content / "pages/draft.md").write_text('+++\ntitle = "Hidden guide"\n'
+                                               'draft = true\n+++\nDraft.', encoding="utf-8")
+        config = self.root / "docs.toml"
+        original = (PROJECT_ROOT / "docs/mizuki.toml").read_text(encoding="utf-8")
+        config.write_text(original.replace('content = "content"',
+                                           'content = ' + json.dumps(str(content)))
+                          .replace('theme = "theme"', 'theme = ' + json.dumps(
+                              str(PROJECT_ROOT / "docs/theme"))), encoding="utf-8")
+        output = self.build("https://docs.example.test/Mizuki/", config=config)
+        homepage = (output / "index.html").read_text(encoding="utf-8")
+        self.assertIn('pages/deep/%E6%96%B0%E5%A2%9E%20guide.html', Page(homepage).guide_links)
+        self.assertIn("&lt;New &amp; guide&gt;", homepage)
+        self.assertIn("Own description &lt;&amp;&gt;", homepage)
+        self.assertNotIn("Hidden guide", homepage)
+        # A card description remains overridable without repeating all page metadata in the theme.
+        with config.open("a", encoding="utf-8") as stream:
+            stream.write('\n[extra.guide_descriptions]\n"<New & guide>" = "Override <&>"\n')
+        homepage = (self.build("/Mizuki/", config=config) / "index.html").read_text(encoding="utf-8")
+        self.assertIn("Override &lt;&amp;&gt;", homepage)
+        self.assertNotIn("Own description &lt;&amp;&gt;", homepage)
 
     def test_local_preview_build(self):
         output = self.build("/Mizuki/")

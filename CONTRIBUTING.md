@@ -4,6 +4,8 @@ Mizuki 的改动应能说明解决了什么问题，并通过已有的构建、�
 
 架构与数据流见[架构设计](docs/content/pages/architecture.md)。文档站使用 Mizuki 自身构建，配置、主题和预览方法见 [docs/README.md](docs/README.md)。修改对外行为时同步更新 `docs/content/pages/` 中的唯一正文来源。
 
+仓库以 `docs/` 文档站作为实际示例和功能验证入口，构建或预览时显式指定 `--config docs/mizuki.toml`。博客场景和默认主题由自动化测试创建临时站点验证，无需在仓库根目录维护另一份示例内容。
+
 ## 代码结构
 
 | 位置 | 职责 |
@@ -92,4 +94,19 @@ Markdown 沿用 md4c 渲染，再从实际生成的 HTML 中收集标题、分�
 
 ## 主题开发
 
-主题接口与迁移规则见 [主题开发指南](docs/content/pages/themes.md)。新增主题能力应通过 `tests/test_theme.py` 检查完整构建输出：同一数据能否生成不同布局、配置合并是否保留类型、HTML 是否正确转义、布局和组件路径是否被限制在主题目录内。错误路径应检查旧输出保留与修复后的恢复。预览测试覆盖组件、主题默认参数和站点覆盖参数的热重载，发行测试覆盖 Inja 与 JSON 的依赖源码及许可证。
+主题接口与迁移规则见 [主题开发指南](docs/content/pages/themes.md)，最小可用主题位于 [`examples/minimal-theme/`](examples/minimal-theme/)。全站 `site.posts`、`site.pages` 与当前列表 `posts`、`archives` 的范围应保持明确，所有摘要通过 `summary_data()` 按当前输出位置转换，均不携带正文。新增主题能力应通过 `tests/test_theme.py` 检查完整构建输出：同一数据能否生成不同布局、配置合并是否保留类型、HTML 是否正确转义、布局和组件路径是否被限制在主题目录内。错误路径应检查旧输出保留与修复后的恢复。`tests/test_theme_data.py` 检查各入口的全站集合、排序、草稿、摘要类型、深层链接与最小主题，文档测试验证新增文稿自动进入首页。预览测试覆盖组件、主题默认参数和站点覆盖参数的热重载，发行测试覆盖 Inja 与 JSON 的依赖源码及许可证。
+
+## 技术写作与本地资源
+
+`MarkdownOptions` 定义 `[markdown]` 的语法开关；HTML 分析收集正文能力与语言信息，构建层将它们交给主题。浏览器脚本、资源引用与样式属于主题。`tests/test_markdown_features.py` 检查语法开关、实际 HTML、资源路径与静态回退，预览测试检查配置热重载。
+
+默认主题和文档主题共享阅读脚本、样式和组件的约定，两份文件需要同步修改；回归测试会检查一致性。`python3 tools/update_reading_assets.py` 下载固定版本的 highlight.js 与 KaTeX，校验包摘要，并更新两份 vendor 资源、所有被引用的 WOFF2 字体及许可证。更新版本时同时更新固定摘要与版本说明。构建与初始化不执行下载脚本，不要求 npm。
+
+可选浏览器检查使用 `playwright-core` 和本机 Chromium，验证两种主题的浅色/深色、手机/桌面、复制原文、公式与 MathML、字体本地加载，以及禁用 JavaScript 后的脚注链接。将 `playwright-core` 安装到项目外，再运行：
+
+```sh
+npm install --prefix /tmp/mizuki-browser --no-audit --no-fund playwright-core
+NODE_PATH=/tmp/mizuki-browser/node_modules node tests/browser_reading.cjs build/bin/mizuki
+```
+
+默认浏览器路径为 `/usr/bin/google-chrome-stable`，可用 `MIZUKI_CHROME` 指定其他 Chromium 可执行文件。测试使用临时站点，并阻止所有站点以外的网络请求；不属于默认 CTest 的依赖。

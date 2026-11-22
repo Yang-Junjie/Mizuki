@@ -2,6 +2,7 @@
 
 from html.parser import HTMLParser
 import json
+import shutil
 import subprocess
 from urllib.parse import quote, unquote, urljoin, urlsplit
 
@@ -85,6 +86,10 @@ class SiteTests(BuilderFixture):
         self.conflict("assets/css/style.css", "content/assets/css/style.css", "theme/assets/css/style.css")
 
     def test_file_then_directory_conflict(self):
+        shutil.rmtree(self.theme / "assets")
+        stylesheet = self.theme / "assets/css/style.css"
+        stylesheet.parent.mkdir(parents=True)
+        stylesheet.write_text("body {}", encoding="utf-8")
         (self.content / "assets").write_text("A file where the assets directory belongs.")
         self.conflict("dist/assets", "content/assets", "theme/assets/css/style.css")
 

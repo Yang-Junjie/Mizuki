@@ -75,10 +75,32 @@ std::vector<NavigationItem> parse_navigation(toml::node const& node) {
     return navigation;
 }
 
+MarkdownOptions parse_markdown(toml::node const& node) {
+    auto const* table = node.as_table();
+    if (!table) {
+        throw std::runtime_error("Configuration 'markdown' must be a table");
+    }
+    check_keys(*table, {"math", "footnotes", "admonitions"});
+    MarkdownOptions options;
+    auto read = [&](std::string_view key, bool& target) {
+        if (auto const* value = table->get(key)) {
+            if (!value->is_boolean()) {
+                throw std::runtime_error("Configuration 'markdown." + std::string(key) +
+                                         "' must be a boolean");
+            }
+            target = *value->value<bool>();
+        }
+    };
+    read("math", options.math);
+    read("footnotes", options.footnotes);
+    read("admonitions", options.admonitions);
+    return options;
+}
+
 void read_config_file(SiteConfig& config) {
     auto const table = toml::parse(read_file(config.config_file));
     check_keys(table, {"title", "description", "author", "language", "content", "theme", "output",
-                       "navigation", "base_url", "paginate_by", "archives", "extra"});
+                       "navigation", "base_url", "paginate_by", "archives", "extra", "markdown"});
     config.base_url = parse_base_url(string_value(table, "base_url", "/"));
     if (auto const* node = table.get("paginate_by")) {
         auto const value = node->value<std::int64_t>();
@@ -93,6 +115,9 @@ void read_config_file(SiteConfig& config) {
             throw std::runtime_error("Configuration 'archives' must be a boolean");
         }
         config.archives = *value;
+    }
+    if (auto const* node = table.get("markdown")) {
+        config.markdown = parse_markdown(*node);
     }
     auto& site = config.site;
     if (auto const* extra = table.get("extra")) {

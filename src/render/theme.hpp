@@ -11,7 +11,7 @@ namespace mizuki {
 // One instance per build: templates are cached within a consistent build snapshot.
 class Theme {
 public:
-    explicit Theme(std::filesystem::path directory);
+    explicit Theme(std::filesystem::path directory, std::string base_path = "/");
     ~Theme();
     Theme(Theme const&) = delete;
     Theme& operator=(Theme const&) = delete;
