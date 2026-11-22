@@ -118,6 +118,11 @@ class DevTests(BuilderFixture):
         self.assertEqual(status, 200)
         return int(re.search(rb'const version = "(\d+)"', body)[1])
 
+    def wait_for_reload(self, previous, path="/"):
+        # Publishing files precedes backup cleanup and the reload notification.
+        # Seeing new HTML alone does not mean the version has advanced yet.
+        self.wait_for(lambda: self.version(path) > previous, "preview reload notification")
+
     def test_initialized_site_and_new_articles_work_in_running_preview(self):
         site = self.root / "created-blog"
 
@@ -200,7 +205,7 @@ class DevTests(BuilderFixture):
         tag("Recovered")
         self.wait_for(lambda: self.http_contains("/blog/tags/Recovered/", "Tagged article")
                       and self.request("/blog/tags/New/")[0] == 404, "tag recovery")
-        self.assertGreater(self.version("/blog/"), version)
+        self.wait_for_reload(version, "/blog/")
         article.unlink()
         self.wait_for(lambda: self.request("/blog/tags/")[0] == 404
                       and self.request("/blog/categories/")[0] == 404, "empty taxonomy cleanup")
@@ -256,7 +261,7 @@ class DevTests(BuilderFixture):
         self.write_page("posts/first.md", "Edited article", "A real content change.")
         self.wait_for(lambda: self.http_contains("/posts/first.html", "A real content change."),
                       "file edit after directory metadata change")
-        self.assertGreater(self.version(), initial)
+        self.wait_for_reload(initial)
         renamed = self.content / "renamed-posts"
         directory.rename(renamed)
         self.wait_for(lambda: self.http_contains("/renamed-posts/first.html", "A real content change.")
@@ -308,7 +313,7 @@ class DevTests(BuilderFixture):
         self.assertEqual(self.version(), version)
         manifest.write_text(text.replace('footer_text = ""', 'footer_text = "Recovered theme"'), encoding="utf-8")
         self.wait_for(lambda: self.http_contains("/", "Recovered theme"), "theme recovery")
-        self.assertGreater(self.version(), version)
+        self.wait_for_reload(version)
         self.assert_no_temporary_directories()
 
     def test_markdown_syntax_and_reading_options_reload(self):
@@ -503,7 +508,7 @@ class DevTests(BuilderFixture):
         conflict.unlink()
         self.write_page("posts/second.md", "Recovered article", "Recovered body.", date="2025-01-01")
         self.wait_for(lambda: self.http_contains("/blog/page/2/", "Recovered article"), "listing recovery")
-        self.assertGreater(self.version("/blog/"), initial)
+        self.wait_for_reload(initial, "/blog/")
         self.assertTrue(self.http_contains("/blog/archives/", "Recovered article"))
         (self.content / "posts/second.md").unlink()
         self.wait_for(lambda: self.request("/blog/page/2/")[0] == 404, "stale pagination removal")
@@ -528,7 +533,7 @@ class DevTests(BuilderFixture):
         self.write_page("posts/first.md", "Repaired", "Recovered after startup failure.")
         self.wait_for(lambda: self.http_contains("/posts/first.html", "Recovered after startup failure."),
                       "recovery after initial failure")
-        self.assertGreater(self.version(), initial_version)
+        self.wait_for_reload(initial_version)
         self.assert_no_temporary_directories()
 
     def test_initial_failed_build_without_output_exits(self):
