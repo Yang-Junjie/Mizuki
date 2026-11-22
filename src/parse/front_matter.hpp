@@ -10,6 +10,7 @@ enum class DocumentKind { Article, Page };
 struct FrontMatter {
     std::string title;
     std::string date;
+    std::string description;
     bool draft{false};
 };
 

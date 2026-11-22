@@ -8,6 +8,7 @@ import shutil
 import socket
 import subprocess
 import time
+import xml.etree.ElementTree as ET
 
 from support import BuilderFixture, run_tests
 
@@ -310,6 +311,35 @@ class DevTests(BuilderFixture):
         self.assertGreater(updated["version"], initial["version"])
         self.assertEqual(updated["base_path"], prefix)
         self.assertEqual(self.request("/ignored/")[0], 404)
+
+    def test_publication_updates_and_xml_failure_preserves_preview_until_recovery(self):
+        self.configure('theme = "theme"\nbase_url = "https://example.com/blog/"\n')
+        self.start(configure=False, path="/blog/")
+        _, response = self.stream(path="/blog/__mizuki/events")
+        initial = self.event(response)
+        status, _, feed = self.request("/blog/rss.xml")
+        self.assertEqual(status, 200)
+        self.assertEqual(ET.fromstring(feed).findtext("channel/item/title"), "First post")
+        status, _, sitemap = self.request("/blog/sitemap.xml")
+        self.assertEqual(status, 200)
+        ET.fromstring(sitemap)
+        self.assertNotIn(b"EventSource", feed)
+        self.assertNotIn(b"EventSource", sitemap)
+        before = self.snapshot()
+        self.write_page("posts/first.md", "Broken XML", "New body.", description="invalid\x01")
+        self.wait_for(lambda: "Invalid UTF-8 or XML character" in self.logs(), "XML failure diagnostic")
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(self.version("/blog/"), initial)
+        self.assertEqual(self.request("/blog/rss.xml")[2], feed)
+        self.write_page("posts/first.md", "Recovered feed", "Recovered body.", description="New summary")
+        self.wait_for(lambda: self.http_contains("/blog/rss.xml", "Recovered feed"), "RSS recovery")
+        self.assertGreater(self.event(response), initial)
+        self.assertTrue(self.http_contains("/blog/posts/first.html", "Recovered body."))
+        self.configure('theme = "theme"\nbase_url = "/blog/"\n', atomic=True)
+        self.wait_for(lambda: self.request("/blog/rss.xml")[0] == 404, "publication disabled")
+        self.assertEqual(self.request("/blog/sitemap.xml")[0], 404)
+        self.assertFalse(self.http_contains("/blog/", 'rel="canonical"'))
+        self.assert_no_temporary_directories()
 
     def test_initial_failed_build_serves_previous_output_and_recovers(self):
         self.build()

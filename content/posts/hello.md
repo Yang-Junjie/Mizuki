@@ -1,6 +1,7 @@
 ---
 title: 第一篇文章
 date: 2026-11-15
+description: 从第一篇 Markdown 文章开始使用 Mizuki。
 ---
 
 这里是 Mizuki 的示例文章。你可以直接修改这篇文章，或在内容目录中添加自己的 Markdown 文件。

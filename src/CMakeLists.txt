@@ -11,7 +11,9 @@ add_library(mizuki_core STATIC
     render/article_list.cpp
     render/html_links.cpp
     render/navigation.cpp
+    render/publication.cpp
     render/template.cpp
+    util/date.cpp
     util/file.cpp
     util/html.cpp
     util/path.cpp

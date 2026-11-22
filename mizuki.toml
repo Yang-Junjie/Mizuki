@@ -3,7 +3,7 @@ title = "Mizuki"
 description = "一个用 C++ 编写的轻量博客框架"
 author = ""
 language = "zh-CN"
-# 发布到子目录时设为 "/blog/" 或 "https://example.com/blog/"。
+# 发布到子目录时设为 "/blog/"；使用 "https://example.com/blog/" 同时启用 RSS、sitemap 与 canonical。
 base_url = "/"
 content = "content"
 theme = "themes/default"

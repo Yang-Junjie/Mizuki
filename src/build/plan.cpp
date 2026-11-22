@@ -83,6 +83,10 @@ BuildPlan plan_build(SiteConfig const& options) {
     reserve("index.html",
             "generated homepage (" + path_to_utf8(options.theme_dir / "layouts/home.html") + ")");
     plan.page_urls.emplace("index.md", "index.html");
+    if (!options.base_url.origin.empty()) {
+        reserve("rss.xml", "generated RSS feed");
+        reserve("sitemap.xml", "generated sitemap");
+    }
 
     for (auto const& source : regular_files(options.content_dir)) {
         auto const relative = source.lexically_relative(options.content_dir);

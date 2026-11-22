@@ -18,6 +18,8 @@ base_url = "https://example.com/blog/"
 
 检查首页、深层文章、独立页面、图片和下载链接，然后把 `dist/` 中的内容发布到该地址。不要再将整个输出包入 `blog/` 目录。部署到域名根目录时使用 `https://example.com/` 或 `/`。
 
+使用完整域名构建时，也会生成 `dist/rss.xml` 和 `dist/sitemap.xml`，默认主题加入对应的 RSS 入口与页面 canonical。仅使用 `/blog/` 模拟子路径时跳过这些发布信息。配置的域名始终是正式发布域名，本地预览仍监听本机地址；在预览中点击 RSS 入口会访问配置的正式地址。
+
 文章中仍写 `[关于](/pages/about.md)`、`![图片](/images/photo.png)`，无需手动加入 `/blog/`；相对链接也可继续使用。自定义主题使用 `{asset_base}` 引用主题资源，使用 `{base_path}` 引用其他站点资源。原样复制的 HTML、CSS 和 `srcset` 请使用适当的相对 URL。
 
 ## GitHub Pages

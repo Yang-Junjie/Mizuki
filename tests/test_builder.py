@@ -64,7 +64,7 @@ class BuilderTests(BuilderFixture):
             encoding="utf-8",
         )
         self.write_page(
-            "posts/old.md", "Old & archived", "Old body.", date="2024-01-01 & old"
+            "posts/old.md", "Old & archived", "Old body.", date="2024-01-01"
         )
         self.write_page(
             "posts/nested/latest.md", 'Latest <article> "new"', "Latest body.",
@@ -84,7 +84,7 @@ class BuilderTests(BuilderFixture):
         self.assertIn('href="posts/nested/space%20%23%26.html"', homepage)
         self.assertIn("Latest &lt;article&gt; &quot;new&quot;", homepage)
         self.assertIn("Old &amp; archived", homepage)
-        self.assertIn("2024-01-01 &amp; old", homepage)
+        self.assertIn("2024-01-01", homepage)
         self.assertNotIn("Hidden draft", homepage)
         self.assertLess(
             homepage.index("Latest &lt;article&gt;"), homepage.index("First post")

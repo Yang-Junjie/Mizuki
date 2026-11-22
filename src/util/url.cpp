@@ -236,4 +236,11 @@ bool has_url_scheme(std::string_view url) {
     return false;
 }
 
+std::string published_url(BaseUrl const& base, std::string_view output_path) {
+    if (base.origin.empty()) {
+        return {};
+    }
+    return base.origin + base.path + encode_url_path(output_path);
+}
+
 } // namespace mizuki

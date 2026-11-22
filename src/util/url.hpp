@@ -12,6 +12,9 @@ struct BaseUrl {
 };
 
 BaseUrl parse_base_url(std::string_view url);
+// output_path is unencoded and relative to the output root; empty denotes the homepage.
+// Returns empty when base has no origin.
+std::string published_url(BaseUrl const& base, std::string_view output_path);
 
 std::string encode_url_path(std::string_view path);
 std::string decode_url_path(std::string_view path);

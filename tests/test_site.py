@@ -388,7 +388,7 @@ url = "https://example.com/path?q=1&x=2"
                         resolved = urlsplit(urljoin("https://example.com" + prefix + page, url))
                         self.assertEqual(resolved.netloc, "example.com")
                         self.assertTrue(resolved.path.startswith(prefix), (page, url))
-                        target = unquote(resolved.path[len(prefix):])
+                        target = unquote(resolved.path[len(prefix):]) or "index.html"
                         self.assertTrue((self.output / target).is_file(), (page, url, target))
                 self.assertFalse((self.output / "blog").exists())
 
