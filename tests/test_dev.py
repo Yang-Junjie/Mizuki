@@ -108,6 +108,35 @@ class DevTests(BuilderFixture):
         self.assertEqual(status, 200)
         return int(re.search(rb'const version = "(\d+)"', body)[1])
 
+    def test_initialized_site_and_new_articles_work_in_running_preview(self):
+        site = self.root / "created-blog"
+
+        def command(*args):
+            result = subprocess.run([str(self.binary), *map(str, args)], cwd=self.root,
+                                    capture_output=True, text=True, encoding="utf-8", timeout=15)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        command("init", site)
+        self.root = site
+        self.content = site / "content"
+        self.theme = site / "themes/default"
+        self.output = site / "dist"
+        command("new", "posts/first.md", "--title", "Created before preview")
+        self.start(configure=False)
+        self.assertTrue(self.http_contains("/posts/first.html", "Created before preview"))
+        self.assertTrue(self.http_contains("/archives/", "Created before preview"))
+        self.assertEqual(self.request("/pages/about.html")[0], 200)
+        self.assertEqual(self.request("/assets/css/style.css")[0], 200)
+        command("new", "posts/live.md", "--title", "Created during preview")
+        self.wait_for(lambda: self.http_contains("/posts/live.html", "Created during preview"),
+                      "new article detected by watcher")
+        self.assertTrue(self.http_contains("/", "Created during preview"))
+        command("new", "posts/draft.md", "--title", "Hidden preview draft", "--draft")
+        command("new", "posts/after-draft.md", "--title", "Published after draft")
+        self.wait_for(lambda: self.http_contains("/", "Published after draft"), "draft rebuild")
+        self.assertEqual(self.request("/posts/draft.html")[0], 404)
+        self.assertFalse(self.http_contains("/", "Hidden preview draft"))
+
     def test_watch_rebuilds_edits_renames_deletions_theme_and_assets(self):
         asset = self.content / "download.bin"
         asset.write_bytes(b"initial")

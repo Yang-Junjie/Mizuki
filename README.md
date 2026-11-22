@@ -1,6 +1,6 @@
 # Mizuki
 
-一个用 C++ 编写的轻量静态博客框架，支持 Markdown 文章、独立页面、TOML 站点配置、本地预览和自动刷新。
+一个用 C++ 编写的轻量静态博客框架，支持站点初始化、文章创建、Markdown 文章、独立页面、TOML 站点配置、本地预览和自动刷新。
 
 ## 编译与运行
 
@@ -33,6 +33,44 @@ ctest --preset linux-debug
 
 Windows 可在 MSVC 开发者终端中使用 Ninja 编译，运行 `build\bin\mizuki.exe`；使用 Visual Studio 多配置生成器时，需带 `--config Release` / `ctest -C Release`，程序位于 `build\bin\Release\mizuki.exe`。原有 MSVC、ClangCL presets 保留，其工具链需与本机安装匹配。GitHub Actions 使用 Linux GCC 和 Windows MSVC + Ninja 构建并运行完整测试；具体平台是否通过以工作流结果为准。
 
+## 创建站点与文章
+
+编译后可安装命令行程序，再将安装目录的 `bin` 加入 `PATH`。默认主题已编入程序，初始化无需访问源码目录或下载主题：
+
+```sh
+cmake --install build --prefix ./build/install --component mizuki
+export PATH="$PWD/build/install/bin:$PATH"
+```
+
+上面的 `export` 适用于 Linux/macOS shell；Windows 将对应安装目录的 `bin` 加入 `Path`。使用 Visual Studio 多配置构建时，安装也需带 `--config Release`。
+
+之后可以在任意工作目录创建独立站点：
+
+```sh
+mizuki init my-blog
+cd my-blog
+mizuki new posts/hello.md --title "第一篇文章"
+mizuki serve
+```
+
+`init` 生成 `mizuki.toml`、`content/posts/welcome.md` 示例文章、`content/pages/about.md` 关于页面、可编辑的 `themes/default/` 和忽略 `/dist/` 的 `.gitignore`。生成的配置启用分页和归档，并提供首页、关于和归档导航，立即运行 `build` 或 `serve` 即可使用。
+
+目标目录必须不存在或为空；`mizuki init .` 可在空的当前目录初始化。非空目录（包括隐藏文件）、普通文件和指向目标目录的符号链接都会被拒绝，已有文件不覆盖。嵌套目录可以自动创建；操作失败时清理本次创建的文件和目录，保留已有目录及其他文件。
+
+`new` 的路径相对于配置中的内容目录，无需再写 `content/` 前缀；父目录自动创建。`--title` 必填，`--description` 可选，均为单行纯文本，保留引号、反斜杠及首尾空白，拒绝空白标题、换行、NUL 等无效字符。生成的 front matter 符合 Mizuki 的简单字面值规则，不按 YAML 转义。日期使用创建时的本地日期 `YYYY-MM-DD`，之后可以自行编辑。
+
+```sh
+mizuki new posts/another.md --title "另一篇文章" --description "文章摘要"
+mizuki new posts/draft.md --title "还在写作" --draft
+mizuki new pages/contact.md --title "联系我"
+mizuki new notes/first.md --title "笔记" --config sites/blog.toml
+mizuki new posts/first.md --title "指定内容目录" --content manuscripts
+```
+
+默认生成 `draft: false`，可以立即出现在预览中；`--draft` 生成草稿，`build`、`watch` 和 `serve` 都跳过它。`pages/` 下的文稿沿用独立页面规则，不进入文章列表。`new` 支持 `--config` 和 `--content`，路径基准与构建命令一致。
+
+新文件必须使用 `.md` 扩展名，路径不能是绝对路径、包含 `..` 或经过内容目录内的符号链接，顶层 `index.md` 保留给自动生成的首页。已有文件、目录和悬空符号链接均不会被替换。以 `-` 开头的路径可以放在 `--` 后，例如 `mizuki new --title "文章" -- -post.md`。运行 `mizuki init --help` 或 `mizuki new --help` 可查看对应参数。
+
 ## 站点配置
 
 默认读取当前工作目录的 `mizuki.toml`，文件不存在时沿用内置默认值。仓库自带可直接运行的配置：
@@ -64,7 +102,7 @@ url = "/archives/"
 
 支持的顶层键只有上例中的项目。`paginate_by` 必须是非负整数，`archives` 必须是布尔值；其余除 `navigation` 外均为字符串。字符串字段中，`description` 和 `author` 允许为空，其余不能为空或全是空白。导航项只能包含非空字符串 `title` 和 `url`。省略导航时默认只有首页，`navigation = []` 隐藏导航。未知键、类型错误、重复键或 TOML 语法错误都会报错，并给出配置文件位置。
 
-所有命令支持指定配置及目录：
+`build`、`watch` 和 `serve` 支持指定配置及目录；`new` 支持其中的 `--config` 和 `--content`：
 
 ```sh
 ./build/bin/mizuki build --config sites/blog.toml
@@ -257,6 +295,6 @@ cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
 
-测试均使用临时目录，包括构建与输出事务、冲突诊断和旧输出保护、Markdown 链接、TOML 校验及优先级、根目录与子目录部署、独立页面和导航、日期与描述校验、RSS/sitemap XML、canonical 与失败回滚，以及真实 `watch` / `serve` 进程的文件变化、配置热重载、监听目录切换、HTTP、SSE 及部署路径切换。测试进程退出时会清理临时文件及子进程。
+测试均使用临时目录，包括仓库外初始化与写作、已有文件保护和创建失败清理、构建与输出事务、冲突诊断和旧输出保护、Markdown 链接、TOML 校验及优先级、根目录与子目录部署、独立页面和导航、日期与描述校验、RSS/sitemap XML、canonical 与失败回滚，以及真实 `watch` / `serve` 进程的文件变化、配置热重载、监听目录切换、HTTP、SSE 及部署路径切换。测试进程退出时会清理临时文件及子进程。
 
 代码分层、接口约定、格式化和单独运行测试的方法见 [开发约定](CONTRIBUTING.md)。

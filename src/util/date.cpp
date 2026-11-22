@@ -1,6 +1,7 @@
 #include "util/date.hpp"
 
 #include <array>
+#include <ctime>
 #include <stdexcept>
 
 namespace mizuki {
@@ -42,6 +43,23 @@ std::string rss_date(std::string_view text) {
     return std::string(weekdays[weekday]) + ", " + std::string(text.substr(8, 2)) + " " +
            std::string(months[static_cast<unsigned>(date.month()) - 1]) + " " +
            std::string(text.substr(0, 4)) + " 00:00:00 GMT";
+}
+
+std::string local_date() {
+    auto const now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+#ifdef _WIN32
+    std::tm storage{};
+    auto const* local = localtime_s(&storage, &now) == 0 ? &storage : nullptr;
+#else
+    auto const* local = std::localtime(&now);
+#endif
+    std::array<char, 11> buffer{};
+    if (!local || std::strftime(buffer.data(), buffer.size(), "%Y-%m-%d", local) == 0) {
+        throw std::runtime_error("Failed to determine the local date");
+    }
+    std::string result(buffer.data());
+    parse_date(result);
+    return result;
 }
 
 } // namespace mizuki

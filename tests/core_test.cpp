@@ -1,6 +1,7 @@
 #include "parse/front_matter.hpp"
 #include "render/publication.hpp"
 #include "render/template.hpp"
+#include "scaffold/files.hpp"
 #include "support.hpp"
 #include "util/file.hpp"
 #include "util/path.hpp"
@@ -81,6 +82,39 @@ void template_failure_has_context_and_does_not_poison_later_renders() {
             "Template loading error omitted file context or underlying cause");
 }
 
+void creation_failure_removes_new_paths_and_preserves_existing_files() {
+    TemporaryDirectory temporary;
+    auto const root = temporary.path();
+    auto const existing = root / "existing";
+    std::filesystem::create_directory(existing);
+    mizuki::write_file(existing / "keep.md", "User content");
+    auto const error = expect_failure([&] {
+        mizuki::FileCreation files;
+        files.write(existing / "nested/post.md", "New article");
+        files.write(root / "new-site/content/post.md", "New site");
+        files.write(existing / "keep.md", "Would overwrite user content");
+    });
+    require(error.find("keep.md") != std::string::npos, "Creation failure omitted the file path");
+    require(mizuki::read_file(existing / "keep.md") == "User content",
+            "Exclusive creation overwrote an existing file");
+    require(std::filesystem::is_directory(existing), "Rollback removed an existing directory");
+    require(!std::filesystem::exists(existing / "nested"), "Rollback left new content directories");
+    require(!std::filesystem::exists(root / "new-site"), "Rollback left an incomplete new site");
+}
+
+void creation_failure_does_not_remove_unrelated_new_files() {
+    TemporaryDirectory temporary;
+    auto const directory = temporary.path() / "shared";
+    {
+        mizuki::FileCreation files;
+        files.write(directory / "owned.md", "Owned by this operation");
+        mizuki::write_file(directory / "unrelated.md", "Created by someone else");
+    }
+    require(!std::filesystem::exists(directory / "owned.md"), "Uncommitted creation was retained");
+    require(mizuki::read_file(directory / "unrelated.md") == "Created by someone else",
+            "Rollback deleted an unrelated file");
+}
+
 void sitemap_enforces_single_file_limits() {
     std::vector<std::string> urls(50000, "https://example.com/");
     require(!mizuki::render_sitemap(urls).empty(), "A sitemap at the URL count limit failed");
@@ -101,6 +135,8 @@ int main() {
         loaded_template_is_reusable_and_renders_independent_values();
         template_failure_has_context_and_does_not_poison_later_renders();
         sitemap_enforces_single_file_limits();
+        creation_failure_removes_new_paths_and_preserves_existing_files();
+        creation_failure_does_not_remove_unrelated_new_files();
     } catch (std::exception const& error) {
         std::cerr << error.what() << '\n';
         return 1;

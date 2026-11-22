@@ -1,0 +1,17 @@
+// Generated from themes/default by CMake. Edit the original theme files.
+#pragma once
+
+#include <array>
+#include <string_view>
+
+namespace mizuki {
+
+struct EmbeddedThemeFile {
+    std::string_view path;
+    std::string_view content;
+};
+
+inline constexpr std::array kEmbeddedTheme{
+@MIZUKI_THEME_FILES@};
+
+} // namespace mizuki
