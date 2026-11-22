@@ -182,4 +182,4 @@ ctest --test-dir build -R 'mizuki.(theme|docs)' --output-on-failure
 
 建议先读 `build/builder.cpp` 理解协调流程，再读 `plan.cpp`、`context.cpp` 和 `render/theme.cpp`。修改预览时，按 `dev/watch.cpp` → `dev/server.cpp` → `dev/live_reload.cpp` → `dev/preview.cpp` 阅读。
 
-格式约定、单组测试与贡献要求见仓库的 [CONTRIBUTING.md](https://github.com/Yang-Junjie/Mizuki/blob/main/CONTRIBUTING.md)。主题对外契约集中在[主题开发](themes.md)，构建产物的托管方式见[部署指南](deployment.md)。
+格式约定、单组测试与贡献要求见[参与贡献](contributing.md)。主题对外契约集中在[主题开发](themes.md)，构建产物的托管方式见[部署指南](deployment.md)。

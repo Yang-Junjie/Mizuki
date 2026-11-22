@@ -200,7 +200,7 @@ def check_binary_package(package_root):
     executable = "mizuki.exe" if os.name == "nt" else "mizuki"
     expected = {f"bin/{executable}", "share/mizuki/LICENSE", "share/mizuki/README.md",
                 "share/mizuki/CHANGELOG.md", "share/mizuki/CONTRIBUTING.md",
-                "share/mizuki/RELEASING.md", "share/mizuki/licenses/fmt/LICENSE"}
+                "share/mizuki/licenses/fmt/LICENSE"}
     documentation_source = Path(__file__).resolve().parents[1] / "docs"
     expected.update("share/mizuki/docs/" + path.relative_to(documentation_source).as_posix()
                     for path in documentation_source.rglob("*") if path.is_file())

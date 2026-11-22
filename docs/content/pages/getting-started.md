@@ -3,11 +3,34 @@ title = "快速开始"
 description = "创建一个可编辑、可预览、可发布的 Mizuki 站点。"
 +++
 
-Mizuki 把 Markdown、TOML 配置和主题模板构建为 HTML、CSS 与资源文件。本地预览时运行 Mizuki；发布后，服务器只需提供生成的静态文件。本文先完成一个博客，再说明本站文档的构建方式。
+Mizuki 把 Markdown、TOML 配置和主题模板构建为 HTML、CSS 与资源文件。本地预览时运行 Mizuki；发布后，服务器只需提供生成的静态文件。本文先完成一个博客；完整字段与参数可以继续查阅[站点配置](configuration.md)、[命令行](cli.md)和[内容与链接](content.md)。
 
 ## 安装与启动
 
-可以从 [GitHub Releases](https://github.com/Yang-Junjie/Mizuki/releases) 下载 Linux 或 Windows x86_64 发布包，解压后将 `bin/` 加入 `PATH`。Linux 发布包的基线是 Ubuntu 24.04；其他平台可以尝试从源码构建。
+从 [GitHub Releases](https://github.com/Yang-Junjie/Mizuki/releases) 下载对应系统的压缩包。日常建站无需安装编译器、CMake、Git 或 Python；默认主题已包含在程序中。
+
+| 系统 | 压缩包 | 发布 CI 的构建与验证基线 |
+| --- | --- | --- |
+| Linux x86_64 | `mizuki-VERSION-linux-x86_64.tar.gz` | Ubuntu 24.04，glibc 2.39 或更新版本 |
+| Windows x86_64 | `mizuki-VERSION-windows-x86_64.zip` | Windows Server 2022，MSVC |
+
+Linux 包静态链接第三方库和 C++ 运行库，仍使用系统的 glibc。Windows 包静态链接第三方库和 MSVC 运行库。其他系统、架构以及 Windows 桌面版本尚未单独验证。
+
+解压后，将其中的 `bin/` 加入当前终端的 `PATH`。Linux shell：
+
+```sh
+export PATH="/path/to/mizuki/bin:$PATH"
+```
+
+Windows PowerShell：
+
+```powershell
+$env:Path = "C:\Tools\mizuki\bin;$env:Path"
+```
+
+每个压缩包附带同名 `.sha256` 文件。Linux 可运行 `sha256sum --check 压缩包文件名.sha256`；Windows 用 `Get-FileHash 压缩包文件名 -Algorithm SHA256`，与文件中的摘要比较。对应源码和依赖位于同一 Release 的 `mizuki-VERSION-source.tar.gz`；许可证和依赖声明随程序放在 `share/mizuki/`。
+
+安装后，创建并启动站点：
 
 ```sh
 mizuki --version
@@ -35,7 +58,7 @@ ctest --test-dir build --output-on-failure
 
 Windows 使用 MSVC 开发者终端与 Ninja 构建时，程序为 `build/bin/mizuki.exe`；Visual Studio 多配置生成器需要增加 `--config Release`，程序位于 `build/bin/Release/mizuki.exe`。
 
-后文的 `mizuki` 表示这个可执行文件。可以将它加入 `PATH`，也可以始终使用绝对路径。
+后文的 `mizuki` 表示这个可执行文件。可以将它加入 `PATH`，也可以始终使用绝对路径。依赖选择、CMake presets 和安装命令见[参与贡献](contributing.md#从源码构建)。
 
 ## 认识站点目录
 
@@ -43,7 +66,7 @@ Windows 使用 MSVC 开发者终端与 Ninja 构建时，程序为 `build/bin/mi
 my-blog/
   mizuki.toml
   content/
-    posts/hello.md
+    posts/welcome.md
     pages/about.md
   themes/default/
     theme.toml
@@ -116,7 +139,7 @@ mizuki new pages/projects.md --title "我的项目"
 
 ```md
 [关于](/pages/about.md)
-[上一篇](../posts/hello.md)
+[欢迎文章](../posts/welcome.md)
 [回到首页](/index.md)
 ```
 
@@ -155,7 +178,7 @@ show_toc = true
 footer_text = "感谢阅读"
 ```
 
-配置中的目录相对配置文件解析。`paginate_by = 0` 关闭分页；`archives = true` 生成按年份分组的归档。导航必须指向已生成的本地页面或外部地址。
+完整字段、内置默认值与校验规则见[站点配置](configuration.md)。配置中的目录相对配置文件解析。`paginate_by = 0` 关闭分页；`archives = true` 生成按年份分组的归档。导航必须指向已生成的本地页面或外部地址。
 
 `[markdown]` 控制数学、脚注与提示块语法，代码、公式及其样式示例见[技术写作](writing.md)。
 
@@ -182,23 +205,12 @@ mizuki build --base-url https://example.com/blog/
 
 正式发布建议提供完整 HTTP(S) 地址，以生成 canonical、RSS 与 sitemap。部署子路径及 GitHub Actions 配置见[部署指南](deployment.md)。
 
-## 构建这个文档站
+## 预览这个文档站
 
-本站没有使用其他文档生成器。仓库中的 `docs/mizuki.toml` 指向 Markdown 正文和一个独立的 Inja 文档主题：
-
-```text
-docs/
-  mizuki.toml
-  content/pages/         # 本文和其他指南
-  theme/layouts/        # 首页、文档布局和组件
-  theme/assets/         # 本站 CSS
-```
-
-在 Mizuki 仓库根目录中运行：
+本站也由 Mizuki 构建。完成源码编译后，在仓库根目录运行：
 
 ```sh
 ./build/bin/mizuki serve --config docs/mizuki.toml
-./build/bin/mizuki build --config docs/mizuki.toml
 ```
 
-本地输出为 `build/docs/`。GitHub Pages 工作流从源码编译同一个程序，再用这份配置构建并上传网页。想理解站点如何生成，可以接着阅读[架构设计](architecture.md)；想修改它的样式，可以直接参考[本站主题源码](https://github.com/Yang-Junjie/Mizuki/tree/main/docs/theme)。
+正文位于 `docs/content/pages/`，主题位于 `docs/theme/`。新增文档、导航、资源与 Pages 部署的方法见[文档维护](documentation.md)。

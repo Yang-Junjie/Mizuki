@@ -24,6 +24,18 @@ title = "快速开始"
 url = "/pages/getting-started.md"
 
 [[navigation]]
+title = "站点配置"
+url = "/pages/configuration.md"
+
+[[navigation]]
+title = "命令行"
+url = "/pages/cli.md"
+
+[[navigation]]
+title = "内容与链接"
+url = "/pages/content.md"
+
+[[navigation]]
 title = "技术写作"
 url = "/pages/writing.md"
 
@@ -32,12 +44,24 @@ title = "主题开发"
 url = "/pages/themes.md"
 
 [[navigation]]
+title = "部署指南"
+url = "/pages/deployment.md"
+
+[[navigation]]
 title = "架构设计"
 url = "/pages/architecture.md"
 
 [[navigation]]
-title = "部署指南"
-url = "/pages/deployment.md"
+title = "参与贡献"
+url = "/pages/contributing.md"
+
+[[navigation]]
+title = "文档维护"
+url = "/pages/documentation.md"
+
+[[navigation]]
+title = "版本发布"
+url = "/pages/releasing.md"
 
 [extra]
 repository_url = "https://github.com/Yang-Junjie/Mizuki"

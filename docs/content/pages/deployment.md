@@ -5,6 +5,31 @@ description = "将 Mizuki 生成的静态网页部署到 GitHub Pages，正确�
 
 站点发布地址通过 `mizuki.toml` 的 `base_url` 设置，也可以使用 `--base-url` 临时覆盖。构建输出由静态文件组成，不需要在发布服务器上运行 Mizuki。
 
+## 部署地址与子路径
+
+`base_url` 默认为 `/`，支持以 `/` 开始的站点路径，或包含域名的 HTTP(S) 地址。缺少结尾 `/` 时会自动补齐，路径中的中文、空格和百分号按 URL 编码规范化。例如：
+
+```toml
+base_url = "https://example.com/blog/"
+```
+
+部署到域名根目录时使用 `https://example.com/`；本地只需要模拟子路径时可以使用 `/blog/`。地址不允许用户名、密码、query、fragment、`.` / `..` 路径段、连续 `/`、控制字符或无效百分号编码；端口范围为 1–65535。域名使用 ASCII 或 Punycode，可使用方括号包裹的 IPv6 地址。`--base-url` 在 `build`、`watch`、`serve` 中均可覆盖配置，并在配置热重载后保留优先级。
+
+内容和导航中的根路径始终从**站点根目录**解析，书写时不包含部署前缀。例如部署到 `/blog/` 时：
+
+| 内容 | 生成结果 |
+| --- | --- |
+| 正文 `[关于](/pages/about.md)` | `href="/blog/pages/about.html"` |
+| 正文 `[下载](/download.zip)` | `href="/blog/download.zip"` |
+| 正文 `![图片](/images/photo.png)` | `src="/blog/images/photo.png"` |
+| 正文 `[关于](../pages/about.md)` | `href="../pages/about.html"` |
+| 默认主题样式、导航、首页文章列表 | 保持相对链接 |
+
+query 和 fragment 保留；外部地址、`//` 地址、纯锚点保持原样。`base_url` 中的域名不会强行加入普通站内链接。输出文件仍直接位于 `dist/`，不会额外创建 `dist/blog/`；部署时将输出目录的内容挂载到 `/blog/`。
+
+`serve` 使用相同的部署路径。例如运行 `mizuki serve --base-url /blog/` 后访问 `http://127.0.0.1:3939/blog/`；`/blog` 会重定向到 `/blog/`，前缀之外的地址返回 404。静态文件与自动刷新 SSE 均使用该前缀。修改 `base_url` 后，构建成功才切换预览路径，并通知已打开的页面转到新路径，保留页面路径、query 和 fragment；构建失败时保留旧输出、旧预览路径和刷新版本。
+
+
 ## 先在本地验证
 
 假设站点地址是 `https://example.com/blog/`：
@@ -21,9 +46,28 @@ mizuki build
 
 检查首页、深层文章、独立页面、图片和下载链接，然后把 `dist/` 中的内容发布到该地址。不要再将整个输出包入 `blog/` 目录。部署到域名根目录时使用 `https://example.com/` 或 `/`。
 
-使用完整域名构建时，也会生成 `dist/rss.xml` 和 `dist/sitemap.xml`，默认主题加入对应的 RSS 入口与页面 canonical。仅使用 `/blog/` 模拟子路径时跳过这些发布信息。配置的域名始终是正式发布域名，本地预览仍监听本机地址；在预览中点击 RSS 入口会访问配置的正式地址。
+配置的域名始终是正式发布域名，本地预览仍监听本机地址；在预览中点击 RSS 入口会访问配置的正式地址。
 
 文章中仍写 `[关于](/pages/about.md)`、`![图片](/images/photo.png)`，无需手动加入 `/blog/`；相对链接也可继续使用。自定义主题使用 `{{ asset_base }}` 引用主题资源，使用 `{{ site.base_path }}` 引用其他站点资源。原样复制的 HTML、CSS 和 `srcset` 请使用适当的相对 URL。
+
+## RSS、sitemap 与规范地址
+
+将 `base_url` 设置为包含域名的完整 HTTP(S) 发布地址即可启用：
+
+```toml
+base_url = "https://example.com/blog/"
+```
+
+成功构建后会生成 `dist/rss.xml` 和 `dist/sitemap.xml`。输出目录仍不包含 `blog/` 前缀：RSS、sitemap 和默认主题的 canonical 地址统一使用完整发布地址，并对中文、空格和特殊字符进行 URL 编码。
+
+- RSS 2.0 只包含已发布文章，使用标题、发布日期、可选描述和页面完整地址；文章地址也作为稳定的 GUID。独立页面、草稿和原样复制的 HTML 不进入订阅源。
+- 发布日期只有日历日期，RSS 将其明确表示为当天 `00:00:00 GMT`，不依赖本机时区或语言环境。订阅源不写入当前构建时间，相同输入的输出保持一致。
+- sitemap 包含首页及其分页、归档、标签与分类总览及其全部分页、已发布文章和独立页面。列表使用目录地址，文稿使用实际 `.html` 地址；不将发布日期或文件时间冒充最后修改时间。当前生成单个文件，最多 50,000 个地址、50 MiB，单个地址少于 2,048 字符；超限会报错，不自动拆分。
+- 默认主题在首页、文章和独立页面的 `<head>` 中加入 canonical 和 RSS 自动发现链接，在页脚显示 RSS 入口。自定义主题使用 `page.canonical_url` 与 `feed_url` 自行输出标签。
+
+当 `base_url` 只是 `/` 或 `/blog/` 时，正常构建和预览，并打印说明；不生成这两个 XML 文件，也不插入 canonical 和订阅链接。切换配置后，下一次成功构建会移除旧的生成文件。没有完整发布地址时，内容目录里自行提供的同名 XML 仍可原样复制。
+
+启用生成后，`rss.xml`、`sitemap.xml` 是受管理的输出路径，与内容文件冲突时会明确报出生成器和输入来源。生成失败会保留之前的完整站点。
 
 ## 本仓库的文档站
 
@@ -39,10 +83,10 @@ Mizuki 仓库已经提供实际使用的 [Pages 工作流](https://github.com/Ya
 本地可以运行同样的静态构建：
 
 ```sh
-./build/bin/mizuki build --config docs/mizuki.toml --base-url https://yang-junjie.github.io/Mizuki/
+./build/bin/mizuki build --config docs/mizuki.toml --base-url https://blog.cglab.top/Mizuki/
 ```
 
-这里的地址是本仓库默认的项目站点地址；正式工作流读取 Pages 配置，不依赖这条示例中的硬编码地址。仅在本地检查项目路径时，可以使用 `--base-url /Mizuki/`。
+这里使用文档站的发布地址；正式工作流读取 Pages 配置，不依赖这条示例中的硬编码地址。仅在本地检查项目路径时，可以使用 `--base-url /Mizuki/`。
 
 ## 为自己的博客配置 GitHub Pages
 
@@ -61,7 +105,6 @@ Mizuki 仓库已经提供实际使用的 [Pages 工作流](https://github.com/Ya
 工作流结构参考 GitHub 官方的 [自定义 Pages 工作流说明](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)、[静态站点示例](https://github.com/actions/starter-workflows/blob/main/pages/static.yml) 和 [`configure-pages` 输出定义](https://github.com/actions/configure-pages/blob/v6/action.yml)。
 
 启用首页分页或文章归档时，整个输出目录应一并发布，包括 `page/2/index.html` 等后续分页与 `archives/index.html`。它们的 canonical 和 sitemap 地址使用目录形式（如 `/blog/page/2/`、`/blog/archives/`），托管服务需要支持目录下的 `index.html`。Mizuki 本地预览与 GitHub Pages 都按此结构提供页面。
-
 
 ## 排查发布问题
 

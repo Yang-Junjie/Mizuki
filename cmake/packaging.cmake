@@ -3,7 +3,6 @@ include(GNUInstallDirs)
 set(distribution_docs "${CMAKE_INSTALL_DATADIR}/mizuki")
 install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" "${PROJECT_SOURCE_DIR}/README.md"
               "${PROJECT_SOURCE_DIR}/CHANGELOG.md" "${PROJECT_SOURCE_DIR}/CONTRIBUTING.md"
-              "${PROJECT_SOURCE_DIR}/RELEASING.md"
     DESTINATION "${distribution_docs}" COMPONENT mizuki)
 
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/docs/"

@@ -1,4 +1,7 @@
-# 发布 Mizuki
++++
+title = "版本发布"
+description = "维护版本号，验证二进制包与离线源码包，并通过标签生成 Release 草稿。"
++++
 
 版本号由根目录 `CMakeLists.txt` 的 `project(Mizuki VERSION ...)` 统一声明。`mizuki --version`、压缩包名称和标签校验都使用该值；发布标签必须是 `v` 加完整版本号，例如 `v0.1.0`。
 
@@ -64,7 +67,7 @@ cmake --build build --parallel 2
 
 ## 准备 Release 草稿
 
-1. 修改 `CMakeLists.txt` 中的版本，并在 `CHANGELOG.md` 增加相同版本的 `## VERSION` 章节。
+1. 修改 `CMakeLists.txt` 中的版本，并在仓库根目录的 `CHANGELOG.md` 增加相同版本的 `## VERSION` 章节。
 2. 提交改动，确认分支 CI 的格式检查、功能测试和发布包验证通过。
 3. 在该提交上创建并推送对应版本标签，例如 `git tag v0.1.0` 和 `git push origin v0.1.0`。
 4. `release.yml` 复用完整 CI。标签与项目版本不一致时，配置阶段直接失败。
@@ -72,3 +75,6 @@ cmake --build build --parallel 2
 6. 检查草稿中的版本、说明和文件后，在 GitHub 上手动发布。
 
 工作流只对创建草稿的 job 授予 `contents: write`。重新运行同一标签可以更新已有草稿及其产物；已经公开的 Release 会被拒绝修改。
+
+
+开发构建与日常测试见[参与贡献](contributing.md)，博客网页的托管见[部署指南](deployment.md)。

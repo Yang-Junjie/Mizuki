@@ -51,6 +51,12 @@ class DocumentationTest(unittest.TestCase):
         "pages/writing.html",
         "pages/architecture.html",
         "pages/deployment.html",
+        "pages/configuration.html",
+        "pages/cli.html",
+        "pages/content.html",
+        "pages/contributing.html",
+        "pages/documentation.html",
+        "pages/releasing.html",
     }
 
     def setUp(self):
