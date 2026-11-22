@@ -3,6 +3,7 @@
 from http.client import HTTPConnection
 from pathlib import Path
 import json
+import os
 import re
 import shutil
 import socket
@@ -239,6 +240,31 @@ class DevTests(BuilderFixture):
         self.write_page("posts/first.md", "Changed", "Preview update.")
         self.wait_for(lambda: self.http_contains("/posts/first.html", "Preview update."), "preview update")
         self.assertGreater(self.event(response), initial)
+
+    def test_directory_metadata_changes_do_not_reload_preview(self):
+        self.start()
+        _, response = self.stream(timeout=0.6)
+        initial = self.event(response)
+        directory = self.content / "posts"
+        previous = directory.stat()
+        os.utime(directory, (previous.st_atime, previous.st_mtime + 10))
+        # Observe an entire polling cycle without an unsolicited reload event.
+        with self.assertRaises((TimeoutError, socket.timeout)):
+            self.event(response)
+        response.close()
+        self.assertEqual(self.version(), initial, self.logs())
+        self.write_page("posts/first.md", "Edited article", "A real content change.")
+        self.wait_for(lambda: self.http_contains("/posts/first.html", "A real content change."),
+                      "file edit after directory metadata change")
+        self.assertGreater(self.version(), initial)
+        renamed = self.content / "renamed-posts"
+        directory.rename(renamed)
+        self.wait_for(lambda: self.http_contains("/renamed-posts/first.html", "A real content change.")
+                      and self.request("/posts/first.html")[0] == 404, "directory rename")
+        shutil.rmtree(renamed)
+        self.wait_for(lambda: self.request("/renamed-posts/first.html")[0] == 404,
+                      "directory deletion")
+        self.assert_no_temporary_directories()
 
     def test_failed_build_keeps_served_output_and_sends_no_reload_then_recovers(self):
         self.start()

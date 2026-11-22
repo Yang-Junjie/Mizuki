@@ -6,6 +6,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <utility>
 
 namespace mizuki {
@@ -24,9 +25,16 @@ struct FileWatcher::Impl final : efsw::FileWatchListener {
     ~Impl() override { watcher.removeWatch(id); }
 
     void handleFileAction(efsw::WatchID, std::string const& directory, std::string const& filename,
-                          efsw::Action, std::string const&) override {
+                          efsw::Action action, std::string const&) override {
         if (callback) {
-            callback(path_from_utf8(directory) / path_from_utf8(filename));
+            auto const path = path_from_utf8(directory) / path_from_utf8(filename);
+            // Windows also reports directory metadata updates as modifications.
+            // File edits and directory additions, moves and deletions remain relevant.
+            std::error_code error;
+            if (action == efsw::Actions::Modified && fs::is_directory(path, error)) {
+                return;
+            }
+            callback(path);
         }
     }
 
