@@ -2,29 +2,21 @@
 {% block content %}
       <section class="hero" aria-labelledby="home-title">
         <div class="hero-copy">
-          <p class="hero-label"><span aria-hidden="true">✳</span> A little space for your ideas</p>
           <h1 id="home-title">把喜欢的事，<br><span>写成自己的小站。</span></h1>
-          <p class="lead">用 Markdown 记录想法，用喜欢的主题表达自己。<br>和 Mizuki 一起，从一篇文字开始。</p>
+          <p class="lead">Mizuki 是一个用 C++ 编写的静态站点生成器。用 Markdown 写作，用主题定制你的站点。</p>
           <div class="hero-actions">
-{% for item in navigation %}{% if item.title == "快速开始" %}            <a class="button" href="{{ item.url }}">开始搭建 <span aria-hidden="true">→</span></a>
-{% endif %}{% if item.title == "主题开发" %}            <a class="button button-secondary" href="{{ item.url }}">制作我的主题 <span aria-hidden="true">↗</span></a>
+{% for item in navigation %}{% if item.title == "快速开始" %}            <a class="button" href="{{ item.url }}">开始搭建</a>
+{% endif %}{% if item.title == "主题开发" %}            <a class="button button-secondary" href="{{ item.url }}">制作我的主题</a>
 {% endif %}{% endfor %}          </div>
-          <div class="hero-details"><span><i aria-hidden="true"></i>C++ 驱动</span><span>静态生成</span><span>自由定制</span></div>
         </div>
         <div class="hero-art" aria-hidden="true">
-          <div class="art-orbit"></div>
-          <span class="art-spark spark-one">✧</span><span class="art-spark spark-two">✳</span><span class="art-spark spark-three">✧</span>
-          <div class="art-caption"><span class="caption-dot"></span>hello, Mizuki.</div>
           <img class="hero-character" src="{{ asset_base }}images/mizuki.webp" width="989" height="1120" alt="" fetchpriority="high">
-          <div class="art-note"><span aria-hidden="true">♡</span> make something lovely</div>
         </div>
       </section>
-      <div class="home-intro"><span class="intro-flower" aria-hidden="true">✳</span><p>简单的框架，装得下你的奇思妙想。</p><span class="intro-line" aria-hidden="true"></span><span class="intro-caption">SMALL &amp; YOURS</span></div>
       <section class="guide-section" aria-labelledby="guides-title">
-        <div class="section-heading"><div><p class="eyebrow">EXPLORE THE DOCS</p><h2 id="guides-title">从这里，慢慢开始<span aria-hidden="true">.</span></h2></div><p>从第一篇文字，到你心中的模样。</p></div>
+        <h2 id="guides-title" class="section-heading">文档指南</h2>
         <div class="guide-grid">
 {% for guide in site.pages %}          <a class="guide-card" href="{{ guide.url }}">
-            <div class="card-top"><span class="card-number" aria-hidden="true">{% if loop.index1 < 10 %}0{% endif %}{{ loop.index1 }}</span><span class="card-arrow" aria-hidden="true">↗</span></div>
             <h3>{{ guide.title }}</h3>
 {% if existsIn(site.extra.guide_descriptions, guide.title) %}            <p>{{ at(site.extra.guide_descriptions, guide.title) }}</p>
 {% else if guide.description != "" %}            <p>{{ guide.description }}</p>
@@ -33,19 +25,13 @@
       </section>
       <section class="home-example" aria-labelledby="example-title">
         <div class="example-copy">
-          <p class="eyebrow">READY WHEN YOU ARE</p>
-          <h2 id="example-title">小站的第一步，<br>只需要三个命令。</h2>
-          <p>准备好 Mizuki，就可以开始写作。<br>这个文档站，也是这样诞生的。</p>
+          <h2 id="example-title">本地预览</h2>
+          <p>安装 Mizuki 后，创建站点并启动本地预览。</p>
         </div>
         <div class="terminal">
-          <div class="terminal-bar">
-            <span class="terminal-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span>my-little-blog</span><span aria-hidden="true">♡</span>
-          </div>
           <pre><code><span class="terminal-prompt" aria-hidden="true">$ </span>mizuki init my-blog
 <span class="terminal-prompt" aria-hidden="true">$ </span>cd my-blog
 <span class="terminal-prompt" aria-hidden="true">$ </span>mizuki serve</code></pre>
-          <div class="terminal-footer"><span aria-hidden="true">✦</span> 下一篇故事，从这里开始。</div>
         </div>
         <img class="example-character" src="{{ asset_base }}images/enana.webp" width="359" height="380" alt="" loading="lazy" aria-hidden="true">
       </section>

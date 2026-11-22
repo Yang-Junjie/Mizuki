@@ -1,13 +1,9 @@
 <aside class="sidebar">
   <details class="site-navigation" open>
-    <summary>翻开文档 <span aria-hidden="true">⌄</span></summary>
+    <summary>文档导航</summary>
     <nav aria-label="文档导航">
-{% for item in navigation %}      <a href="{{ item.url }}"{% if item.url == page.url %} aria-current="page"{% endif %}><span class="nav-dot" aria-hidden="true"></span>{{ item.title }}</a>
+{% for item in navigation %}      <a href="{{ item.url }}"{% if item.url == page.url %} aria-current="page"{% endif %}>{{ item.title }}</a>
 {% endfor %}    </nav>
   </details>
-  <div class="sidebar-note">
-    <img src="{{ asset_base }}images/logo.webp" width="28" height="28" alt="">
-    <p>你正在阅读的文档站，<br>也是一个 Mizuki 小站。</p>
-    <a href="{{ site.extra.repository_url }}/tree/main/docs/theme">看看它的主题源码 <span aria-hidden="true">↗</span></a>
-  </div>
+  <a class="theme-source" href="{{ site.extra.repository_url }}/tree/main/docs/theme">主题源码</a>
 </aside>
