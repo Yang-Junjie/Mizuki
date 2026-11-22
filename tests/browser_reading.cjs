@@ -121,7 +121,8 @@ async function main() {
           }));
           assert.ok(sizing.scroll <= sizing.width + 1, JSON.stringify({ theme, width, colorScheme, sizing }));
           assert.ok(sizing.code && sizing.math);
-          assert.equal(sizing.keyword, colorScheme === "dark" ? "rgb(255, 143, 163)" : "rgb(163, 21, 66)");
+          const lightKeyword = theme === "docs" ? "rgb(165, 53, 99)" : "rgb(163, 21, 66)";
+          assert.equal(sizing.keyword, colorScheme === "dark" ? "rgb(255, 143, 163)" : lightKeyword);
           await page.addStyleTag({ content: ":root { --syntax-keyword: #123456; --code-font-size: 17px; --math-font-size: 22px; --footnote-font-size: 13px; --admonition-warning: #654321; }" });
           const custom = await page.evaluate(() => ({
             keyword: getComputedStyle(document.querySelector(".hljs-keyword")).color,
