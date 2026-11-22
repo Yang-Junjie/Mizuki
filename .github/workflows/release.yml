@@ -1,0 +1,72 @@
+name: Prepare release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/ci.yml
+    with:
+      release_tag: ${{ github.ref_name }}
+
+  draft:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mizuki-*-x86_64
+          merge-multiple: true
+          path: release-assets
+      - name: Check release assets
+        working-directory: release-assets
+        shell: bash
+        run: |
+          version="${RELEASE_TAG#v}"
+          for package in "mizuki-$version-linux-x86_64.tar.gz" "mizuki-$version-windows-x86_64.zip" "mizuki-$version-source.tar.gz"; do
+            test -f "$package"
+            sha256sum --check "$package.sha256"
+          done
+      - name: Extract version notes
+        shell: python
+        run: |
+          from pathlib import Path
+          import os
+
+          version = os.environ['RELEASE_TAG'].removeprefix('v')
+          heading = f'## {version}\n'
+          changelog = Path('CHANGELOG.md').read_text(encoding='utf-8')
+          if heading not in changelog:
+              raise SystemExit(f'Missing changelog section: {version}')
+          notes = changelog.split(heading, 1)[1].split('\n## ', 1)[0].strip()
+          if not notes:
+              raise SystemExit(f'Empty changelog section: {version}')
+          (Path(os.environ['RUNNER_TEMP']) / 'release-notes.md').write_text(notes + '\n', encoding='utf-8')
+      - name: Create or update draft
+        shell: bash
+        run: |
+          state="$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null || true)"
+          if [[ "$state" == 'false' ]]; then
+            echo 'Refusing to modify an already published release.' >&2
+            exit 1
+          fi
+          if [[ "$state" == 'true' ]]; then
+            gh release edit "$RELEASE_TAG" --draft --title "Mizuki $RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "Mizuki $RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" release-assets/*
+          fi

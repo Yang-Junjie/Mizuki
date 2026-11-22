@@ -2,56 +2,44 @@
 
 一个用 C++ 编写的轻量静态博客框架，支持站点初始化、文章创建、Markdown 文章、独立页面、TOML 站点配置、本地预览和自动刷新。
 
-## 编译与运行
+## 下载与快速开始
 
-需要 CMake 3.28 或更新版本、支持 C++23 的编译器和 Git。启用测试还需要 Python 3；测试只使用 Python 标准库。
+版本发布后，可从仓库的 Releases 页面下载对应系统的压缩包。日常建站无需安装编译器、CMake、Git 或 Python；默认主题已包含在程序中。
+
+| 系统 | 压缩包 | 发布 CI 的构建与验证基线 |
+| --- | --- | --- |
+| Linux x86_64 | `mizuki-VERSION-linux-x86_64.tar.gz` | Ubuntu 24.04，glibc 2.39 或更新版本 |
+| Windows x86_64 | `mizuki-VERSION-windows-x86_64.zip` | Windows Server 2022，MSVC |
+
+Linux 包静态链接第三方库和 C++ 运行库，仍使用系统的 glibc。Windows 包静态链接第三方库和 MSVC 运行库。其他系统、架构以及 Windows 桌面版本尚未单独验证。
+
+解压后，将其中的 `bin` 目录加入当前终端的 `PATH`。例如，Linux shell：
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
-cmake --build build --parallel 2
-ctest --test-dir build --output-on-failure
-
-# 在项目根目录构建、持续构建，或启动预览
-./build/bin/mizuki build
-./build/bin/mizuki watch
-./build/bin/mizuki serve
-./build/bin/mizuki serve --port 4000
+export PATH="/path/to/mizuki/bin:$PATH"
 ```
 
-默认预览地址是 `http://127.0.0.1:3939`，按 Ctrl+C 退出。`--port` 仅用于 `serve`，范围为 1–65535；端口占用会报错退出。
+Windows PowerShell：
 
-CMake 使用 spdlog、md4c、efsw、cpp-httplib 和 toml++。依赖版本在 `cmake/third_party_*.cmake` 中固定；可用的 spdlog、md4c 和 toml++ 安装包会优先被查找，其余通过 FetchContent 下载，首次配置需要网络。加入 `-DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER` 可全部使用项目固定的源码依赖。不需要测试时可设 `-DBUILD_TESTING=OFF`，无需 Python。
-
-Linux 安装 Ninja 后，也可使用 `linux-debug` / `linux-release` presets：
-
-```sh
-cmake --preset linux-debug
-cmake --build --preset linux-debug
-ctest --preset linux-debug
-./build/linux-debug/bin/mizuki serve
+```powershell
+$env:Path = "C:\Tools\mizuki\bin;$env:Path"
 ```
 
-Windows 可在 MSVC 开发者终端中使用 Ninja 编译，运行 `build\bin\mizuki.exe`；使用 Visual Studio 多配置生成器时，需带 `--config Release` / `ctest -C Release`，程序位于 `build\bin\Release\mizuki.exe`。原有 MSVC、ClangCL presets 保留，其工具链需与本机安装匹配。GitHub Actions 使用 Linux GCC 和 Windows MSVC + Ninja 构建并运行完整测试；具体平台是否通过以工作流结果为准。
-
-## 创建站点与文章
-
-编译后可安装命令行程序，再将安装目录的 `bin` 加入 `PATH`。默认主题已编入程序，初始化无需访问源码目录或下载主题：
+然后在准备存放博客的目录运行：
 
 ```sh
-cmake --install build --prefix ./build/install --component mizuki
-export PATH="$PWD/build/install/bin:$PATH"
-```
-
-上面的 `export` 适用于 Linux/macOS shell；Windows 将对应安装目录的 `bin` 加入 `Path`。使用 Visual Studio 多配置构建时，安装也需带 `--config Release`。
-
-之后可以在任意工作目录创建独立站点：
-
-```sh
+mizuki --version
 mizuki init my-blog
 cd my-blog
 mizuki new posts/hello.md --title "第一篇文章"
 mizuki serve
 ```
+
+打开 `http://127.0.0.1:3939` 预览，修改文章会自动重建并刷新浏览器，按 Ctrl+C 退出。运行 `mizuki build` 生成可部署的 `dist/`。
+
+每个压缩包附带同名 `.sha256` 文件。Linux 可运行 `sha256sum --check 压缩包文件名.sha256`；Windows 可用 `Get-FileHash 压缩包文件名 -Algorithm SHA256`，与 `.sha256` 中的摘要比较。对应源码和依赖位于同一 Release 的 `mizuki-VERSION-source.tar.gz`；许可证和依赖声明随程序放在 `share/mizuki/`。
+
+## 创建站点与文章
 
 `init` 生成 `mizuki.toml`、`content/posts/welcome.md` 示例文章、`content/pages/about.md` 关于页面、可编辑的 `themes/default/` 和忽略 `/dist/` 的 `.gitignore`。生成的配置启用分页和归档，并提供首页、关于和归档导航，立即运行 `build` 或 `serve` 即可使用。
 
@@ -286,6 +274,48 @@ Output path conflict
 目录替换期间可能短暂无法访问输出路径。本机制不保证进程崩溃后的自动恢复，也不支持多个进程同时构建同一输出目录。
 
 预览只监听本机地址；HTML 响应会注入 SSE 自动刷新脚本，静态产物不包含该脚本。浏览器断线后会自动重连；构建失败不触发刷新。
+
+## 源码构建
+
+需要 CMake 3.28 或更新版本、支持 C++23 的编译器和 Git。启用测试还需要 Python 3；测试只使用 Python 标准库。
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+cmake --build build --parallel 2
+ctest --test-dir build --output-on-failure
+
+# 在项目根目录构建、持续构建，或启动预览
+./build/bin/mizuki build
+./build/bin/mizuki watch
+./build/bin/mizuki serve
+./build/bin/mizuki serve --port 4000
+```
+
+默认预览地址是 `http://127.0.0.1:3939`，按 Ctrl+C 退出。`--port` 仅用于 `serve`，范围为 1–65535；端口占用会报错退出。
+
+CMake 使用 spdlog、md4c、efsw、cpp-httplib 和 toml++。依赖版本在 `cmake/third_party_*.cmake` 中固定；可用的 spdlog、md4c 和 toml++ 安装包会优先被查找，其余通过 FetchContent 下载，首次配置需要网络。加入 `-DFETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER` 可全部使用项目固定的源码依赖。不需要测试时可设 `-DBUILD_TESTING=OFF`，无需 Python。
+
+Linux 安装 Ninja 后，也可使用 `linux-debug` / `linux-release` presets：
+
+```sh
+cmake --preset linux-debug
+cmake --build --preset linux-debug
+ctest --preset linux-debug
+./build/linux-debug/bin/mizuki serve
+```
+
+Windows 可在 MSVC 开发者终端中使用 Ninja 编译，运行 `build\bin\mizuki.exe`；使用 Visual Studio 多配置生成器时，需带 `--config Release` / `ctest -C Release`，程序位于 `build\bin\Release\mizuki.exe`。原有 MSVC、ClangCL presets 保留，其工具链需与本机安装匹配。GitHub Actions 使用 Linux GCC 和 Windows MSVC + Ninja 构建并运行完整测试；具体平台是否通过以工作流结果为准。
+
+编译后可安装命令行程序，再将安装目录的 `bin` 加入 `PATH`。默认主题已编入程序，初始化无需访问源码目录或下载主题：
+
+```sh
+cmake --install build --prefix ./build/install --component mizuki
+export PATH="$PWD/build/install/bin:$PATH"
+```
+
+Windows 将对应安装目录的 `bin` 加入 `Path`。使用 Visual Studio 多配置构建时，安装也需带 `--config Release`。
+
+发布构建、源码包和 Release 草稿流程见 [发布说明](RELEASING.md)。
 
 ## 回归测试
 

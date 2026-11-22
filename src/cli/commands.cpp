@@ -1,6 +1,7 @@
 #include "cli/commands.hpp"
 
 #include "build/builder.hpp"
+#include "cli/version.hpp"
 #include "config/config.hpp"
 #include "dev/server.hpp"
 #include "dev/watch.hpp"
@@ -25,7 +26,7 @@ namespace {
 constexpr int kDefaultPort = 3939;
 
 enum class Command { Build, Watch, Serve, Init, New };
-enum class ParseResult { Ok, Help, Error };
+enum class ParseResult { Ok, Exit, Error };
 
 struct CliOptions {
     Command command{Command::Build};
@@ -71,6 +72,9 @@ void print_usage(std::optional<Command> command = std::nullopt) {
                  "  --output DIR   Generated site directory (default: dist)\n"
                  "  --base-url URL Published site URL or path (default: /)\n"
                  "  --port PORT    Preview port for serve (default: 3939)\n"
+                 "\n"
+                 "Global options:\n"
+                 "  --version, -V  Show the program version\n"
                  "  --help, -h     Show help; use init --help or new --help for creation options\n";
 }
 
@@ -107,7 +111,15 @@ ParseResult parse_args(int argc, char** argv, CliOptions& cli) {
     std::string_view const command_name(argv[1]);
     if (command_name == "--help" || command_name == "-h") {
         print_usage();
-        return ParseResult::Help;
+        return ParseResult::Exit;
+    }
+    if (command_name == "--version" || command_name == "-V") {
+        if (argc != 2) {
+            spdlog::error("--version does not accept arguments");
+            return ParseResult::Error;
+        }
+        std::cout << "mizuki " << kVersion << '\n';
+        return ParseResult::Exit;
     }
 
     auto const command = parse_command(command_name);
@@ -129,7 +141,7 @@ ParseResult parse_args(int argc, char** argv, CliOptions& cli) {
         std::string_view const option(argv[index]);
         if (!positional_only && (option == "--help" || option == "-h")) {
             print_usage(cli.command);
-            return ParseResult::Help;
+            return ParseResult::Exit;
         }
         if (!positional_only && option == "--" && !building) {
             positional_only = true;
@@ -215,7 +227,7 @@ int run_cli(int argc, char** argv) {
     CliOptions cli;
     try {
         auto const result = parse_args(argc, argv, cli);
-        if (result == ParseResult::Help) {
+        if (result == ParseResult::Exit) {
             return 0;
         }
         if (result == ParseResult::Error) {

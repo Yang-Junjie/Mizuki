@@ -41,6 +41,8 @@ ctest --test-dir build --output-on-failure
 
 未安装 clang-format 时不创建格式化目标，正常编译和测试不受影响。CI 使用 clang-format 18 检查格式，并在 Linux 和 Windows 上构建、运行测试。
 
+项目版本只在根目录 `CMakeLists.txt` 的 `project(... VERSION ...)` 中声明，CLI 版本头和压缩包名称从这里生成。发布构建使用 `MIZUKI_BUILD_DISTRIBUTION=ON`，固定源码依赖、静态链接第三方库和 C++ 运行库。打包、兼容基线与标签流程见 [发布说明](RELEASING.md)。
+
 ## 测试
 
 Python 测试只依赖标准库，共享夹具在 `tests/support.py`，导入测试模块不会读取或修改命令行参数。可运行单组测试，也可通过环境变量指定程序后使用 unittest discovery：
@@ -51,6 +53,8 @@ MIZUKI_BINARY="$PWD/build/bin/mizuki" python3 -m unittest discover -s tests -v
 ```
 
 Windows 上使用对应的 `.exe` 路径并按终端语法设置环境变量。C++ 测试验证输出事务回滚、文档所有权、模板复用和错误上下文；Python 测试覆盖完整构建、发布信息和真实预览进程。RSS 和 sitemap 使用标准库 XML 解析器验证实际输出。
+
+发布构建的测试需要 Python 3.12 或更新版本。`mizuki.package` 生成归档和校验文件，在临时中文路径下解压，检查实际文件清单、许可证和运行库依赖，再使用包内程序完成创建、构建、预览与监听重建。Linux 的 `mizuki.source_package` 还会生成包含依赖的源码包，在关闭 FetchContent 下载的情况下重新构建并验证站点流程。两个测试串行使用打包目录，验证通过的归档保留在构建目录的 `packages/` 中，供 CI 上传。
 
 涉及输出或失败路径的修改，应验证旧产物是否保留；涉及热重载的修改，应验证修复后能否恢复，以及失败是否错误触发刷新。修改生成逻辑时，应比较文件清单和实际内容，避免只检查进程退出码。
 

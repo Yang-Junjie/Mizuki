@@ -42,6 +42,11 @@ target_link_libraries(mizuki_dev PUBLIC mizuki_core PRIVATE
 
 add_executable(mizuki main.cpp cli/commands.cpp)
 target_link_libraries(mizuki PRIVATE mizuki_dev spdlog::spdlog)
+configure_file(cli/version.hpp.in generated/cli/version.hpp @ONLY)
+target_include_directories(mizuki PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+if(MIZUKI_BUILD_DISTRIBUTION AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(mizuki PRIVATE -static-libstdc++ -static-libgcc)
+endif()
 
 foreach(target mizuki_core mizuki_dev mizuki)
     mizuki_configure_target(${target})

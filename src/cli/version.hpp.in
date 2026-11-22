@@ -1,0 +1,7 @@
+#pragma once
+
+namespace mizuki {
+
+inline constexpr char kVersion[] = "@PROJECT_VERSION@";
+
+} // namespace mizuki

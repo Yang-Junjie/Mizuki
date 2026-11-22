@@ -1,7 +1,8 @@
 # Apply project policy only to our targets, never to fetched dependencies.
 function(mizuki_configure_target target)
     target_compile_features(${target} PUBLIC cxx_std_23)
-    set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
+    # These targets use headers; module scanning can mishandle source paths with spaces.
+    set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF CXX_SCAN_FOR_MODULES OFF)
     if(MSVC)
         target_compile_options(${target} PRIVATE /utf-8 /W4)
     else()
