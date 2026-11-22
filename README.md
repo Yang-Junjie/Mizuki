@@ -1,6 +1,6 @@
 # Mizuki
 
-一个用 C++ 编写的轻量静态博客框架，支持站点初始化、文章创建、Markdown 文章、独立页面、TOML 站点配置、本地预览和自动刷新。
+一个用 C++ 编写的轻量静态博客框架，支持站点初始化、文章创建、Markdown 文章、独立页面、标签与分类、TOML 站点配置、本地预览和自动刷新。
 
 [在线文档](https://blog.cglab.top/Mizuki/)使用 Mizuki 自身构建，包含[快速开始](docs/content/pages/getting-started.md)、[技术写作](docs/content/pages/writing.md)、[主题开发](docs/content/pages/themes.md)、[架构设计](docs/content/pages/architecture.md)与[部署指南](docs/content/pages/deployment.md)。本地预览方法见 [docs/README.md](docs/README.md)。
 
@@ -160,6 +160,8 @@ title = "第一篇文章"
 date = "2026-11-22"
 description = "一段用于页面描述和 RSS 摘要的介绍。"
 draft = false
+tags = ["C++", "图形学"]
+categories = ["技术笔记"]
 
 [extra]
 cover = "images/cover.webp"
@@ -179,6 +181,7 @@ name = "Artichoke"
 - 内容根目录下 `pages/` 内的 Markdown 是独立页面，使用 `layouts/page.html`，允许省略 `date`；若提供日期则使用同一套格式与日历校验。独立页面不进入首页文章列表，可以加入导航。
 - `description` 是可选字符串。默认主题用它作为页面的 meta description，省略或为空时回退到站点 `description`；RSS 仅在文章自身有描述时输出摘要，不从正文自动截取。
 - `layout = "special/project.html"` 可为文章或独立页面选择主题 `layouts/` 下的模板，省略时分别使用 `post.html` 或 `page.html`。
+- `tags`、`categories` 是可选字符串数组，仅用于文章，分别生成标签和分类聚合页；详见下节。
 - `draft = true` 跳过页面，不生成 HTML，不占用输出路径。草稿仍需有合法的 front matter。
 - TOML 根级只允许上述字段与 `extra`；未知键、重复键、字段类型错误和格式错误会中止构建，并保留上次成功输出。
 
@@ -186,7 +189,25 @@ name = "Artichoke"
 
 默认主题通过页面 `show_toc` 覆盖站点目录开关，并在详情页、首页列表与归档显示 `cover`。封面路径从站点根目录解析，例如图片放在 `content/images/cover.webp`，写 `cover = "images/cover.webp"`；也支持外部图片 URL。`url(page.extra.cover)` 负责 URL 编码与部署子路径，`cover_alt` 是可选说明。
 
-已有的 `---` 简单 `key: value` 文稿继续支持；它不是完整 YAML，不支持列表或嵌套数据。需要自定义参数时改用 TOML，详见[主题开发指南](docs/content/pages/themes.md)。
+已有的 `---` 简单 `key: value` 文稿继续支持；它不是完整 YAML。`tags` 和 `categories` 可使用行内 TOML 数组，例如 `tags: ["C++", "图形学"]`，不支持 YAML 的多行列表或嵌套数据。需要自定义参数时改用 TOML，详见[主题开发指南](docs/content/pages/themes.md)。
+
+### 标签与分类
+
+文章的 `tags = ["C++", "图形学"]` 与 `categories = ["技术笔记"]` 放在 front matter 根级、`[extra]` 之前。一篇文章可以属于多个标签和分类；分类采用扁平结构。`extra` 中的同名字段仍是主题自定义数据，不参与聚合。
+
+有已发布文章使用标签或分类时，自动生成对应的总览与文章列表：
+
+```text
+tags/index.html
+tags/C++/index.html
+tags/C++/page/2/index.html       # 启用分页且超过一页时生成
+categories/index.html
+categories/技术笔记/index.html
+```
+
+名称去除首尾空白并按精确名称去重，保留中文、空格与 `C++` 等字符；链接按 URL 规则编码，例如 `/tags/C%2B%2B/`。不做大小写合并或 slug 转写，仅大小写不同的名称触发输出冲突。名称须是合法的单层目录名，空值、路径分隔符、控制字符及保留文件名等会报错，完整限制见[技术写作](docs/content/pages/writing.md#标签与分类)。
+
+列表沿用首页的排序与 `paginate_by`，`0` 表示不分页。草稿不参与计数或页面生成；最后一篇文章移除某个标签或分类后，下次成功构建会清理对应旧页面。自定义主题提供 `layouts/taxonomy.html` 和 `layouts/term.html` 控制总览、列表与分页；没有对应内容时无需这些布局。所有模板都能读取 `site.tags`、`site.categories`，文章与摘要通过 `tags`、`categories` 获得名称和链接，详见[主题开发](docs/content/pages/themes.md#标签与分类页面)。
 
 ### 导航与文内链接
 
@@ -265,7 +286,7 @@ base_url = "https://example.com/blog/"
 
 - RSS 2.0 只包含已发布文章，使用标题、发布日期、可选描述和页面完整地址；文章地址也作为稳定的 GUID。独立页面、草稿和原样复制的 HTML 不进入订阅源。
 - 发布日期只有日历日期，RSS 将其明确表示为当天 `00:00:00 GMT`，不依赖本机时区或语言环境。订阅源不写入当前构建时间，相同输入的输出保持一致。
-- sitemap 包含生成的首页、已发布文章和独立页面。首页使用站点根地址，其余页面使用实际 `.html` 地址；不将发布日期或文件时间冒充最后修改时间。当前生成单个文件，最多 50,000 个地址、50 MiB，单个地址少于 2,048 字符；超限会报错，不自动拆分。
+- sitemap 包含首页及其分页、归档、标签与分类总览及其全部分页、已发布文章和独立页面。列表使用目录地址，文稿使用实际 `.html` 地址；不将发布日期或文件时间冒充最后修改时间。当前生成单个文件，最多 50,000 个地址、50 MiB，单个地址少于 2,048 字符；超限会报错，不自动拆分。
 - 默认主题在首页、文章和独立页面的 `<head>` 中加入 canonical 和 RSS 自动发现链接，在页脚显示 RSS 入口。自定义主题使用 `page.canonical_url` 与 `feed_url` 自行输出标签。
 
 当 `base_url` 只是 `/` 或 `/blog/` 时，正常构建和预览，并打印说明；不生成这两个 XML 文件，也不插入 canonical 和订阅链接。切换配置后，下一次成功构建会移除旧的生成文件。没有完整发布地址时，内容目录里自行提供的同名 XML 仍可原样复制。
@@ -307,6 +328,8 @@ url = "/archives/"
 | `layouts/archives.html` | 年份归档，获得完整的 `archives` 分组；启用归档时使用 |
 | `layouts/post.html` | 普通文章，获得 `page`、`toc` 与 `page.headings` |
 | `layouts/page.html` | 独立页面，获得相同的正文与标题数据 |
+| `layouts/taxonomy.html` | 标签或分类总览，获得 `taxonomy` 和 `terms` |
+| `layouts/term.html` | 单个标签或分类的文章列表，获得 `taxonomy`、`term`、`posts` 和 `pagination` |
 
 默认主题通过 `base.html` 共享基础结构，通过 `partials/` 组织导航、列表、分页、目录和页脚。主题可自由调整页面结构，不要求出现固定变量。例如文章列表可以直接写为：
 

@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -17,7 +16,7 @@ namespace mizuki {
 namespace {
 
 std::string_view trim(std::string_view text) {
-    auto const is_space = [](char ch) { return std::isspace(static_cast<unsigned char>(ch)) != 0; };
+    auto const is_space = [](char ch) { return ch == ' ' || (ch >= '\t' && ch <= '\r'); };
     while (!text.empty() && is_space(text.front())) {
         text.remove_prefix(1);
     }
@@ -46,10 +45,48 @@ std::string_view unquote(std::string_view value) {
 }
 
 bool equals_ignore_case(std::string_view lhs, std::string_view rhs) {
-    return std::ranges::equal(lhs, rhs, [](char left, char right) {
-        return std::tolower(static_cast<unsigned char>(left)) ==
-               std::tolower(static_cast<unsigned char>(right));
-    });
+    auto const lowercase = [](char ch) {
+        return ch >= 'A' && ch <= 'Z' ? static_cast<char>(ch - 'A' + 'a') : ch;
+    };
+    return std::ranges::equal(lhs, rhs, {}, lowercase, lowercase);
+}
+
+std::vector<std::string> term_names(toml::node const& node, std::string_view key) {
+    auto const* array = node.as_array();
+    if (!array) {
+        throw std::runtime_error("Invalid front matter: '" + std::string(key) +
+                                 "' must be an array of strings");
+    }
+    std::vector<std::string> names;
+    for (auto const& value : *array) {
+        auto const text = value.value<std::string>();
+        if (!value.is_string() || !text) {
+            throw std::runtime_error("Invalid front matter: '" + std::string(key) +
+                                     "' must be an array of strings");
+        }
+        auto const name = std::string(trim(*text));
+        // Each term names one portable output directory. Do not silently change its identity.
+        auto const invalid =
+            name.empty() || name == "." || name == ".." || name.ends_with('.') ||
+            std::ranges::any_of(name, [](unsigned char ch) {
+                return ch < 32 || ch == 127 ||
+                       std::string_view("/\\<>:\"|?*").find(ch) != std::string_view::npos;
+            });
+        auto const stem = std::string_view(name).substr(0, name.find('.'));
+        bool const device = equals_ignore_case(stem, "con") || equals_ignore_case(stem, "prn") ||
+                            equals_ignore_case(stem, "aux") || equals_ignore_case(stem, "nul") ||
+                            (stem.size() == 4 && stem.back() >= '1' && stem.back() <= '9' &&
+                             (equals_ignore_case(stem.substr(0, 3), "com") ||
+                              equals_ignore_case(stem.substr(0, 3), "lpt")));
+        if (invalid || device) {
+            throw std::runtime_error("Invalid front matter: '" + std::string(key) +
+                                     "' contains an invalid term name: " + name);
+        }
+        if (std::ranges::find(names, name) == names.end()) {
+            names.push_back(name);
+        }
+    }
+    return names;
 }
 
 FrontMatter parse_literal_metadata(std::string_view remaining) {
@@ -59,6 +96,8 @@ FrontMatter parse_literal_metadata(std::string_view remaining) {
     bool has_draft = false;
     bool has_description = false;
     bool has_layout = false;
+    bool has_tags = false;
+    bool has_categories = false;
     std::string line_error;
 
     while (!remaining.empty()) {
@@ -108,6 +147,25 @@ FrontMatter parse_literal_metadata(std::string_view remaining) {
                 throw std::runtime_error("Invalid front matter: 'layout' must be non-empty");
             }
             metadata.layout = value;
+        } else if (key == "tags" || key == "categories") {
+            auto& seen = key == "tags" ? has_tags : has_categories;
+            if (seen) {
+                throw std::runtime_error("Duplicate front matter key: " + std::string(key));
+            }
+            seen = true;
+            try {
+                auto const table = toml::parse("terms = " + std::string(value));
+                auto const* terms = table.get("terms");
+                if (!terms) {
+                    throw std::runtime_error("Invalid front matter: '" + std::string(key) +
+                                             "' must be an array of strings");
+                }
+                (key == "tags" ? metadata.tags : metadata.categories) = term_names(*terms, key);
+            } catch (toml::parse_error const& error) {
+                throw std::runtime_error("Invalid front matter: '" + std::string(key) +
+                                         "' must be an inline TOML array of strings: " +
+                                         std::string(error.description()));
+            }
         } else if (key == "draft") {
             if (has_draft) {
                 throw std::runtime_error("Duplicate front matter key: draft");
@@ -149,8 +207,8 @@ FrontMatter parse_toml_metadata(std::string_view source) {
         throw std::runtime_error(message.str());
     }
     FrontMatter metadata;
-    constexpr std::array<std::string_view, 6> keys{"title",  "date",  "description",
-                                                   "layout", "draft", "extra"};
+    constexpr std::array<std::string_view, 8> keys{"title", "date",  "description", "layout",
+                                                   "draft", "extra", "tags",        "categories"};
     for (auto const& [key, value] : table) {
         auto const name = key.str();
         if (std::ranges::find(keys, name) == keys.end()) {
@@ -182,6 +240,8 @@ FrontMatter parse_toml_metadata(std::string_view source) {
                 throw std::runtime_error("Invalid front matter: 'draft' must be a boolean");
             }
             metadata.draft = *value.value<bool>();
+        } else if (name == "tags" || name == "categories") {
+            (name == "tags" ? metadata.tags : metadata.categories) = term_names(value, name);
         } else if (name == "extra") {
             if (!value.is_table()) {
                 throw std::runtime_error("Invalid front matter: 'extra' must be a table");
@@ -221,6 +281,11 @@ Document parse_document(std::string_view source, DocumentKind kind) {
         }
         if (!metadata.date.empty()) {
             parse_date(metadata.date);
+        }
+        if (kind == DocumentKind::Page &&
+            (!metadata.tags.empty() || !metadata.categories.empty())) {
+            throw std::runtime_error("Invalid front matter: tags and categories are only supported "
+                                     "on articles, not independent pages");
         }
         return {std::move(metadata), std::string(remaining)};
     }

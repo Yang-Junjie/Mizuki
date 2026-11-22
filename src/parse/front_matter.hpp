@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace mizuki {
 
@@ -14,6 +15,8 @@ struct FrontMatter {
     std::string description;
     std::string layout;
     bool draft{false};
+    std::vector<std::string> tags;
+    std::vector<std::string> categories;
     nlohmann::json extra = nlohmann::json::object();
 };
 

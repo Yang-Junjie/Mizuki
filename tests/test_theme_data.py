@@ -129,7 +129,7 @@ name = "Page author"''')
                         entries = rendered.collections[collection]
                         self.assert_links(entries, expected, base_url, name)
                         for entry in entries:
-                            self.assertEqual(entry["data-fields"], "5")
+                            self.assertEqual(entry["data-fields"], "7")
                             self.assertEqual(entry["data-has-content"], "false")
                             self.assertEqual(entry["data-extra-object"], "true")
                             self.assertEqual(entry["data-has-site-only"], "false")

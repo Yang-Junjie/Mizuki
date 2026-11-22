@@ -72,6 +72,8 @@ title = "我的第一篇文章"
 date = "2026-11-22"
 description = "记录建站的第一步。"
 draft = false
+tags = ["建站", "Mizuki"]
+categories = ["笔记"]
 +++
 
 这是正文。
@@ -81,7 +83,7 @@ draft = false
 使用段落、列表、代码块和链接组织内容。
 ```
 
-`init` 与 `new` 生成由 `+++` 包裹的 TOML front matter。内置字段为 `title`、`date`、`description`、`draft` 与 `layout`；自定义数据放在 `[extra]` 中，可使用数组与嵌套表。文章要求非空标题与有效的 `YYYY-MM-DD` 日期；日期可以使用带引号的字符串或 TOML 本地日期，独立页面可以省略日期。`draft = true` 的内容不发布，日期本身不承担定时发布功能。
+`init` 与 `new` 生成由 `+++` 包裹的 TOML front matter。内置字段为 `title`、`date`、`description`、`draft`、`layout`、`tags` 与 `categories`；自定义数据放在 `[extra]` 中，可使用数组与嵌套表。文章要求非空标题与有效的 `YYYY-MM-DD` 日期；日期可以使用带引号的字符串或 TOML 本地日期，独立页面可以省略日期。`draft = true` 的内容不发布，日期本身不承担定时发布功能。
 
 例如为当前页面关闭目录并设置封面图，在结束的 `+++` 前添加：
 
@@ -93,6 +95,8 @@ cover_alt = "山间的晨光"
 ```
 
 图片放在 `content/images/cover.webp`。默认主题会在详情页、首页列表和归档中显示封面，并按部署路径生成图片地址。页面目录设置优先于站点 `[extra].show_toc`；更多数据用法见[主题开发](themes.md#页面自定义数据)。已有的 `---` 简单键值文稿仍可构建；需要数组、嵌套数据或 TOML 注释时，请将开头和结尾改为 `+++`，并把字段改写为 TOML。
+
+文章可以有多个标签和分类，分别填写根级 `tags`、`categories` 字符串数组。默认主题在文章中显示链接，首页提供总览入口，并自动生成对应列表和分页；草稿不参与聚合。分类为扁平结构，独立页面不填写这两项。名称和路径规则见[技术写作](writing.md#标签与分类)。
 
 需要先写草稿时：
 

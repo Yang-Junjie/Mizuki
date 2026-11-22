@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+    <p><a href="{{ taxonomy.url }}">全部{{ taxonomy.title }}</a></p>
+    <h1>{{ term.name }}</h1>
+    <p>{{ term.count }} 篇文章</p>
+    <ul>
+{% for post in posts %}      <li><a href="{{ post.url }}">{{ post.title }}</a> <time>{{ post.date }}</time></li>
+{% endfor %}    </ul>
+{% if pagination.total_pages > 1 %}    <nav aria-label="文章分页">
+{% if pagination.previous_url != "" %}      <a rel="prev" href="{{ pagination.previous_url }}">上一页</a>
+{% endif %}      <span>{{ pagination.current_page }} / {{ pagination.total_pages }}</span>
+{% if pagination.next_url != "" %}      <a rel="next" href="{{ pagination.next_url }}">下一页</a>
+{% endif %}    </nav>
+{% endif %}{% endblock %}

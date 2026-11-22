@@ -99,6 +99,8 @@ def preview(binary, site, environment):
 
             wait_for_page("/blog/", "Mizuki")
             wait_for_page("/blog/posts/" + quote("第一篇文章.html"), "发布包验证")
+            wait_for_page("/blog/tags/C%2B%2B/", "发布包验证")
+            wait_for_page("/blog/categories/Notes/", "发布包验证")
             check(request("/blog/assets/css/style.css")[0] == 200, "Missing preview stylesheet")
             check(request("/blog/posts/draft.html")[0] == 404, "Preview published a draft")
             run(binary, "new", "posts/live.md", "--title", "Created while serving",
@@ -130,7 +132,8 @@ def smoke_test(binary, version, root, documentation_config):
     article = site / "content/posts/第一篇文章.md"
     source = article.read_text(encoding="utf-8")
     check(source.startswith("+++\n"), "Content creation did not generate TOML front matter")
-    article.write_text(source.replace("\n+++\n", '\n[extra]\nshow_toc = false\n'
+    article.write_text(source.replace("\n+++\n", '\ntags = ["C++", "中文"]\ncategories = ["Notes"]\n'
+                       '[extra]\nshow_toc = false\n'
                        'cover = "images/cover.svg"\n+++\n', 1)
                        + "## Package section\n\n```cpp\nint answer = 42;\n```\n\n"
                          "$x^2$ and a note[^n].\n\n[^n]: Packaged footnote.\n", encoding="utf-8")
@@ -158,6 +161,11 @@ def smoke_test(binary, version, root, documentation_config):
     for name in ["index.html", "archives/index.html", "pages/about.html",
                  "posts/第一篇文章.html", "assets/css/style.css", "rss.xml", "sitemap.xml"]:
         check((output / name).is_file(), f"Missing generated file: {name}")
+    for name in ["tags/index.html", "tags/C++/index.html", "tags/中文/index.html",
+                 "categories/index.html", "categories/Notes/index.html"]:
+        check((output / name).is_file(), f"Packaged theme did not generate taxonomy page: {name}")
+    check('../tags/C%2B%2B/' in page and '../categories/Notes/' in page,
+          "Packaged theme did not render the article taxonomy links")
     check(not (output / "posts/draft.html").exists(), "Build published a draft")
     feed = ET.parse(output / "rss.xml")
     check('发布包验证 "中文"' in [item.text for item in feed.findall("./channel/item/title")],
@@ -182,6 +190,10 @@ def smoke_test(binary, version, root, documentation_config):
           "Packaged minimal theme did not render the site-wide pages collection")
     check('aria-label="最近文章"' in minimal_page,
           "Packaged minimal theme did not render the site-wide posts collection")
+    check((minimal_output / "tags/C++/index.html").is_file()
+          and (minimal_output / "categories/Notes/index.html").is_file(),
+          "Packaged minimal theme did not generate taxonomy pages")
+
 
 
 def check_binary_package(package_root):

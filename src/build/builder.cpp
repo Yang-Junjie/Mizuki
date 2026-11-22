@@ -52,6 +52,8 @@ std::string render_page(PlannedPage const& page, Theme& theme, SiteConfig const&
         data["title"] = metadata.title;
         data["date"] = metadata.date;
         data["extra"] = metadata.extra;
+        data["tags"] = term_links(metadata.tags, "tags", page.output);
+        data["categories"] = term_links(metadata.categories, "categories", page.output);
         data["description"] =
             metadata.description.empty() ? config.site.description : metadata.description;
         data["content"] = html;
@@ -81,14 +83,7 @@ std::string render_listing(SiteConfig const& config, BuildPlan const& plan, std:
     context["page"]["title"] =
         index == 0 ? config.site.title
                    : config.site.title + " · 第 " + std::to_string(index + 1) + " 页";
-    context["pagination"] = {
-        {"current_page", index + 1},
-        {"total_pages", plan.listings.size()},
-        {"previous_url",
-         index == 0 ? std::string{} : listing_url(plan.listings[index - 1].output, listing.output)},
-        {"next_url", index + 1 == plan.listings.size()
-                         ? std::string{}
-                         : listing_url(plan.listings[index + 1].output, listing.output)}};
+    context["pagination"] = pagination_data(plan.listings, index);
     return theme.render("home.html", context);
 }
 
@@ -110,6 +105,48 @@ std::string render_archives(SiteConfig const& config, BuildPlan const& plan, The
         articles = articles.subspan(count);
     }
     return theme.render("archives.html", context);
+}
+
+nlohmann::json taxonomy_context(SiteConfig const& config, BuildPlan const& plan,
+                                PlannedTaxonomy const& taxonomy, fs::path const& output,
+                                nlohmann::json const& extra) {
+    auto context = collection_context(config, plan, output, extra);
+    context["taxonomy"] = {{"name", taxonomy.name},
+                           {"title", taxonomy.title},
+                           {"url", listing_url(fs::path(taxonomy.name) / "index.html", output)}};
+    return context;
+}
+
+std::string render_taxonomy(SiteConfig const& config, BuildPlan const& plan,
+                            PlannedTaxonomy const& taxonomy, Theme& theme,
+                            nlohmann::json const& extra) {
+    auto const output = fs::path(taxonomy.name) / "index.html";
+    auto context = taxonomy_context(config, plan, taxonomy, output, extra);
+    context["page"]["kind"] = "taxonomy";
+    context["page"]["title"] = taxonomy.title;
+    context["terms"] = term_data(taxonomy, output);
+    return theme.render("taxonomy.html", context);
+}
+
+std::string render_term(SiteConfig const& config, BuildPlan const& plan,
+                        PlannedTaxonomy const& taxonomy, PlannedTerm const& term, std::size_t index,
+                        Theme& theme, nlohmann::json const& extra) {
+    auto const& listing = term.listings[index];
+    auto context = taxonomy_context(config, plan, taxonomy, listing.output, extra);
+    context["page"]["kind"] = "term";
+    auto title = taxonomy.title + "：" + term.name;
+    if (index != 0) {
+        title += " · 第 " + std::to_string(index + 1) + " 页";
+    }
+    context["page"]["title"] = title;
+    context["term"] = {{"name", term.name},
+                       {"url", listing_url(term.listings.front().output, listing.output)},
+                       {"count", term.articles.size()}};
+    for (auto const article : std::span(term.articles).subspan(listing.offset, listing.count)) {
+        context["posts"].push_back(summary_value(plan.articles[article], listing.output));
+    }
+    context["pagination"] = pagination_data(term.listings, index);
+    return theme.render("term.html", context);
 }
 
 } // namespace
@@ -135,6 +172,24 @@ BuildStats build_site(SiteConfig const& config) {
         fs::create_directories(destination.parent_path());
         write_file(destination, render_archives(config, plan, theme, extra));
     }
+    std::size_t taxonomy_pages = 0;
+    for (auto const& taxonomy : plan.taxonomies) {
+        if (taxonomy.terms.empty()) {
+            continue;
+        }
+        auto const destination = output.stage() / taxonomy.name / "index.html";
+        fs::create_directories(destination.parent_path());
+        write_file(destination, render_taxonomy(config, plan, taxonomy, theme, extra));
+        ++taxonomy_pages;
+        for (auto const& term : taxonomy.terms) {
+            for (std::size_t index = 0; index < term.listings.size(); ++index) {
+                auto const path = output.stage() / term.listings[index].output;
+                fs::create_directories(path.parent_path());
+                write_file(path, render_term(config, plan, taxonomy, term, index, theme, extra));
+                ++taxonomy_pages;
+            }
+        }
+    }
     if (!config.base_url.origin.empty()) {
         write_file(output.stage() / "rss.xml",
                    render_rss(config.site, config.base_url, plan.articles));
@@ -149,6 +204,18 @@ BuildStats build_site(SiteConfig const& config) {
         for (auto const& page : plan.pages) {
             urls.push_back(published_url(config.base_url, path_to_utf8(page.output)));
         }
+        for (auto const& taxonomy : plan.taxonomies) {
+            if (taxonomy.terms.empty()) {
+                continue;
+            }
+            urls.push_back(published_url(config.base_url, taxonomy.name + "/"));
+            for (auto const& term : taxonomy.terms) {
+                for (auto const& listing : term.listings) {
+                    urls.push_back(published_url(config.base_url,
+                                                 path_to_utf8(listing.output.parent_path()) + "/"));
+                }
+            }
+        }
         write_file(output.stage() / "sitemap.xml", render_sitemap(urls));
     } else {
         spdlog::info("Skipping RSS, sitemap and canonical URLs: set base_url to a complete HTTP(S) "
@@ -160,7 +227,7 @@ BuildStats build_site(SiteConfig const& config) {
         fs::copy_file(asset.source, destination);
     }
     output.commit();
-    return {plan.pages.size() + plan.listings.size() + (config.archives ? 1 : 0),
+    return {plan.pages.size() + plan.listings.size() + (config.archives ? 1 : 0) + taxonomy_pages,
             plan.assets.size()};
 }
 

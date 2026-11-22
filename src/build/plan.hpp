@@ -32,6 +32,18 @@ struct PlannedListing {
     std::size_t count;
 };
 
+struct PlannedTerm {
+    std::string name;
+    std::vector<std::size_t> articles;
+    std::vector<PlannedListing> listings;
+};
+
+struct PlannedTaxonomy {
+    std::string name;
+    std::string title;
+    std::vector<PlannedTerm> terms;
+};
+
 struct BuildPlan {
     std::string base_path{"/"};
     std::vector<PlannedPage> pages;
@@ -39,6 +51,7 @@ struct BuildPlan {
     std::vector<ContentSummary> articles;
     std::vector<ContentSummary> independent_pages;
     std::vector<PlannedListing> listings;
+    std::vector<PlannedTaxonomy> taxonomies;
     std::map<std::filesystem::path, std::filesystem::path> page_urls;
     std::set<std::filesystem::path> outputs;
 };

@@ -33,7 +33,7 @@ Json page_context(SiteConfig const& config, BuildPlan const& plan, fs::path cons
     }
     auto const canonical = published_url(config.base_url, path_to_utf8(output));
     auto const url = relative_url(output, output);
-    return {
+    auto context = Json{
         {"site",
          {{"title", site.title},
           {"description", site.description},
@@ -43,7 +43,9 @@ Json page_context(SiteConfig const& config, BuildPlan const& plan, fs::path cons
           {"base_path", config.base_url.path},
           {"extra", extra},
           {"posts", summary_data(plan.articles, output)},
-          {"pages", summary_data(plan.independent_pages, output)}}},
+          {"pages", summary_data(plan.independent_pages, output)},
+          {"tags", Json::array()},
+          {"categories", Json::array()}}},
         {"page",
          {{"kind", "home"},
           {"title", site.title},
@@ -51,6 +53,8 @@ Json page_context(SiteConfig const& config, BuildPlan const& plan, fs::path cons
           {"description", site.description},
           {"content", ""},
           {"extra", Json::object()},
+          {"tags", Json::array()},
+          {"categories", Json::array()},
           {"url", url},
           {"headings", Json::array()},
           {"features",
@@ -63,19 +67,63 @@ Json page_context(SiteConfig const& config, BuildPlan const& plan, fs::path cons
         {"posts", Json::array()},
         {"archives", Json::array()},
         {"toc", Json::array()},
+        {"terms", Json::array()},
+        {"taxonomy", {{"name", ""}, {"title", ""}, {"url", ""}}},
+        {"term", {{"name", ""}, {"url", ""}, {"count", 0}}},
         {"pagination",
          {{"current_page", 1}, {"total_pages", 1}, {"previous_url", ""}, {"next_url", ""}}},
     };
+    for (auto const& taxonomy : plan.taxonomies) {
+        context["site"][taxonomy.name] = term_data(taxonomy, output);
+    }
+    return context;
+}
+
+Json term_links(std::span<std::string const> names, std::string_view taxonomy,
+                fs::path const& output) {
+    auto result = Json::array();
+    for (auto const& name : names) {
+        auto const target = path_from_utf8(taxonomy) / path_from_utf8(name) / "index.html";
+        result.push_back({{"name", name}, {"url", listing_url(target, output)}});
+    }
+    return result;
+}
+
+Json term_data(PlannedTaxonomy const& taxonomy, fs::path const& output) {
+    auto result = Json::array();
+    for (auto const& term : taxonomy.terms) {
+        result.push_back({{"name", term.name},
+                          {"url", listing_url(term.listings.front().output, output)},
+                          {"count", term.articles.size()}});
+    }
+    return result;
+}
+
+Json pagination_data(std::span<PlannedListing const> listings, std::size_t index) {
+    auto const& output = listings[index].output;
+    return {{"current_page", index + 1},
+            {"total_pages", listings.size()},
+            {"previous_url",
+             index == 0 ? std::string{} : listing_url(listings[index - 1].output, output)},
+            {"next_url", index + 1 == listings.size()
+                             ? std::string{}
+                             : listing_url(listings[index + 1].output, output)}};
+}
+
+Json summary_value(ContentSummary const& summary, fs::path const& output) {
+    return {{"title", summary.title},
+            {"date", summary.date},
+            {"description", summary.description},
+            {"extra", summary.extra},
+            {"url", relative_url(path_from_utf8(summary.url), output)},
+            {"tags", term_links(summary.tags, "tags", output)},
+            {"categories", term_links(summary.categories, "categories", output)}};
 }
 
 Json summary_data(std::span<ContentSummary const> summaries, fs::path const& output) {
     auto result = Json::array();
     for (auto const& summary : summaries) {
-        result.push_back({{"title", summary.title},
-                          {"date", summary.date},
-                          {"description", summary.description},
-                          {"extra", summary.extra},
-                          {"url", relative_url(path_from_utf8(summary.url), output)}});
+        result.push_back(summary_value(summary, output));
     }
     return result;
 }

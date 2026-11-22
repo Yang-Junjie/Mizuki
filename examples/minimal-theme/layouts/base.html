@@ -14,7 +14,9 @@
     <nav aria-label="独立页面">
 {% for entry in site.pages %}      <a href="{{ entry.url }}"{% if entry.url == page.url %} aria-current="page"{% endif %}>{{ entry.title }}</a>
 {% endfor %}    </nav>
-  </header>
+{% if length(site.tags) > 0 %}    <a href="{{ url("tags/") }}">标签</a>
+{% endif %}{% if length(site.categories) > 0 %}    <a href="{{ url("categories/") }}">分类</a>
+{% endif %}  </header>
   <main>
 {% block content %}{% endblock %}
   </main>

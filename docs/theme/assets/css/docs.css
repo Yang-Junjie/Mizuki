@@ -68,7 +68,7 @@ h1, h2, h3, h4 { line-height: 1.4; }
 .home-example pre { padding: 28px; border: 1px solid var(--border); }
 .document-grid { display: grid; grid-template-columns: minmax(0, 780px) minmax(155px, 210px); gap: 40px; padding-top: 32px; justify-content: start; align-items: start; }
 .document { grid-column: 1; grid-row: 1; min-width: 0; }
-.document-header { max-width: 780px; margin: 44px 0 0; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+.document-header { overflow-wrap: anywhere; max-width: 780px; margin: 44px 0 0; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
 .document-header .eyebrow { margin: 0 0 14px; }
 .document-header h1 { margin: 0 0 12px; font-size: 36px; letter-spacing: -0.025em; font-weight: 650; }
 .document-header .lead { margin: 0; font-size: 16px; }

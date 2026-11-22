@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+      <header class="document-header">
+        <h1 id="document-title">{{ page.title }}</h1>
+      </header>
+      <article class="document" aria-labelledby="document-title">
+        <div class="prose">
+          <ul>
+{% for entry in terms %}            <li><a href="{{ entry.url }}">{{ entry.name }}</a>（{{ entry.count }} 篇文章）</li>
+{% endfor %}          </ul>
+        </div>
+      </article>
+{% endblock %}

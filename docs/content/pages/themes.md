@@ -19,7 +19,7 @@ Mizuki 使用 Inja 3.5.0 渲染主题，站点配置与主题配置都使用 TOM
 
 ## 从最小主题开始
 
-如果想从少量代码理解接口，可直接使用仓库的 [`examples/minimal-theme/`](https://github.com/Yang-Junjie/Mizuki/tree/main/examples/minimal-theme)。它包含基础布局、四个入口和一份 CSS，不需要 C++ 修改、前端构建工具或脚本。
+如果想从少量代码理解接口，可直接使用仓库的 [`examples/minimal-theme/`](https://github.com/Yang-Junjie/Mizuki/tree/main/examples/minimal-theme)。它包含基础布局、六个入口和一份 CSS，不需要 C++ 修改、前端构建工具或脚本。
 
 在仓库根目录运行：
 
@@ -28,7 +28,7 @@ Mizuki 使用 Inja 3.5.0 渲染主题，站点配置与主题配置都使用 TOM
   --theme examples/minimal-theme --output build/minimal-theme --base-url /Mizuki/
 ```
 
-文档全部是独立页面，因此首页的文章列表为空，页头会自动列出所有文档。用于自己的博客时，将该目录复制到站点的 `themes/minimal/`，设置 `theme = "themes/minimal"`，再运行 `mizuki serve`。最小主题同时支持文章、独立页面、分页和归档。
+文档全部是独立页面，因此首页的文章列表为空，页头会自动列出所有文档。用于自己的博客时，将该目录复制到站点的 `themes/minimal/`，设置 `theme = "themes/minimal"`，再运行 `mizuki serve`。最小主题同时支持文章、独立页面、分页、归档、标签和分类。
 
 ## 文件组织
 
@@ -41,6 +41,8 @@ my-theme/
     post.html
     page.html
     archives.html
+    taxonomy.html
+    term.html
     special/project.html
     partials/navigation.html
   assets/
@@ -55,6 +57,8 @@ my-theme/
 | `post.html` | 没有指定 `layout` 的已发布文章 |
 | `page.html` | 没有指定 `layout` 的已发布独立页面 |
 | `archives.html` | 启用年份归档时 |
+| `taxonomy.html` | 有已发布标签或分类时，用于各自的总览 |
+| `term.html` | 有已发布标签或分类时，用于单个条目的文章列表与分页 |
 
 只读取实际使用的模板。模板不要求出现任何固定变量；作者自行决定布局与展示字段。
 
@@ -143,9 +147,9 @@ my-theme/
 
 | 范围 | 使用的字段 | 职责 |
 | --- | --- | --- |
-| 全站 | `site`，包括 `site.posts`、`site.pages` | 站点设置与全部已发布内容摘要，所有入口都可读取 |
+| 全站 | `site`，包括 `site.posts`、`site.pages`、`site.tags`、`site.categories` | 站点设置与全部已发布内容摘要，所有入口都可读取 |
 | 当前页 | `page`、`toc` | 正在渲染的页面，包括它自己的正文与标题 |
-| 当前列表 | `posts`、`archives`、`pagination` | 当前首页分页的切片，或归档页的年份分组与分页状态 |
+| 当前列表 | `posts`、`archives`、`pagination`、`taxonomy`、`terms`、`term` | 首页或条目分页的切片、归档年份分组、标签与分类数据 |
 
 全站集合不受当前页类型和分页影响。读取集合只提供数据，额外输出页面仍由构建计划决定。所有入口均获得下列字段；不适用的集合为空数组，未设置的文本通常为空字符串。
 
@@ -157,9 +161,11 @@ my-theme/
 | `site.extra` | 主题默认值与站点覆盖值合并后的参数对象 |
 | `site.posts` | 全站已发布文章摘要，日期降序，同日按输出路径升序 |
 | `site.pages` | 全站已发布独立页面摘要，按输出路径升序 |
-| `page.kind` | `home`、`post`、`page` 或 `archives` |
+| `site.tags`、`site.categories` | 全站已发布标签与分类，条目为 `name`、`url`、`count`，按名称 UTF-8 字节排序 |
+| `page.kind` | `home`、`post`、`page`、`archives`、`taxonomy` 或 `term` |
 | `page.title`、`page.date`、`page.description` | 当前页元数据；列表页日期为空，描述使用站点描述；正文页描述为空时回退到站点描述 |
-| `page.extra` | 当前文档的自定义参数对象；未声明时、首页分页与归档页均为空对象 |
+| `page.extra` | 当前文档的自定义参数对象；未声明时与集合页均为空对象 |
+| `page.tags`、`page.categories` | 当前文章的条目链接，每项为 `name`、`url`；其他页面为空数组 |
 | `page.content` | Markdown 转换并改写链接后的 HTML；列表页为空 |
 | `page.url` | 相对当前页的自身地址；列表页为目录形式 |
 | `page.canonical_url` | 配置完整域名时的规范地址，否则为空；列表页为目录形式 |
@@ -169,7 +175,8 @@ my-theme/
 | `asset_base` | 相对当前页的主题资源目录，包含结尾 `/` |
 | `feed_url` | 完整 RSS 地址；未配置域名时为空 |
 | `navigation` | 导航数组，每项为 `title`、`url` |
-| `posts` | 当前首页分页的文章摘要，按发布日期排序 |
+| `posts` | 当前首页或标签／分类条目分页的文章摘要，按发布日期排序 |
+| `taxonomy`、`terms`、`term` | 当前聚合页数据，详见下文的标签与分类接口 |
 | `archives` | 年份分组数组，每项为 `year`、`posts`，仅归档页有数据 |
 | `toc` | 正文二、三级标题树，每项为 `level`、`id`、`text`、`url`、`children` |
 | `pagination.current_page`、`pagination.total_pages` | 从 1 开始的页码与总页数；非列表页均为 1 |
@@ -184,12 +191,13 @@ my-theme/
 | `date` | 文稿自己的日期；独立页面允许没有日期，此时为空字符串 |
 | `description` | 文稿自己的描述；没有填写时为空，不回退到站点描述 |
 | `extra` | 文稿自己的自定义参数；保留布尔、数值、数组与嵌套表，未设置时为空对象 |
+| `tags`、`categories` | 文稿的条目链接，条目为 `name`、`url`，按文稿中首次出现的顺序排列；独立页面为空数组 |
 
 摘要不含正文、标题列表或阅读特征；当前正文通过 `page.content` 获取。`extra` 不与 `site.extra` 合并。当前文章或独立页面也包含在它自己的全站集合中。
 
-`site.pages` 只收集 `content/pages/` 下已发布的 Markdown；文章、首页分页、归档和复制的 HTML 资源均不在其中。草稿不出现在任何发布集合。排序比较的是未编码输出路径的 UTF-8 字节，独立页面不按日期或标题排序；需要手动排序的导航可以继续使用配置中的 `navigation`。
+`site.pages` 只收集 `content/pages/` 下已发布的 Markdown；文章、首页分页、归档、标签／分类页和复制的 HTML 资源均不在其中。草稿不出现在任何发布集合。排序比较的是未编码输出路径的 UTF-8 字节，独立页面不按日期或标题排序；需要手动排序的导航可以继续使用配置中的 `navigation`。
 
-根级 `posts` 只在首页及其分页提供当前切片，在详情页、独立页面和归档页为空。`archives` 只在归档页提供完整年份分组，在其他入口为空。其他入口读取最近文章时应使用 `site.posts`。
+根级 `posts` 只在首页及其分页、标签／分类条目页及其分页提供当前切片；在详情页、独立页面、归档和总览页为空。`archives` 只在归档页提供完整年份分组，在其他入口为空。其他入口读取最近文章时应使用 `site.posts`。
 
 全站摘要、当前列表、导航、分页和资源地址均已适配当前输出路径及中文、空格编码，包括深层正文、后续分页与归档页。直接使用相应 URL 字段，不再拼接 `site.base_path`，也不再传给 `url()`。`site.extra`、`page.extra` 和摘要 `extra` 中的自定义字符串与 URL 不自动改写。模板中的站内资源可通过 `url()` 生成地址，详见下文。
 
@@ -237,6 +245,60 @@ my-theme/
 ```
 
 这些列表使用已有输出地址，在当前页面中展示内容。自定义样式、数量和筛选条件属于主题；模板不会为筛选结果自动创建新文件。
+
+## 标签与分类页面
+
+构建器根据文章根级 `tags`、`categories` 自动创建页面；主题负责其 HTML、样式与交互，不需修改 C++。文稿格式、名称限制和生成时机见[技术写作](writing.md#标签与分类)。没有已发布条目时，不生成该类型的总览或列表，也不读取对应布局。
+
+两个布局共用于标签与分类，可按 `taxonomy.name` 区分：
+
+| 字段 | `taxonomy.html` 总览 | `term.html` 文章列表 |
+| --- | --- | --- |
+| `page.kind` | `taxonomy` | `term` |
+| `taxonomy` | `{name, title, url}` | `{name, title, url}` |
+| `terms` | 当前类型全部条目的 `{name, url, count}` 数组 | 空数组 |
+| `term` | `{name: "", url: "", count: 0}` | 当前条目的 `{name, url, count}` |
+| `posts` | 空数组 | 当前条目的文章分页切片 |
+| `pagination` | 默认一页 | 与首页相同的页码和前后页链接 |
+
+`taxonomy.name` 为 `tags` 或 `categories`，`title` 分别为“标签”或“分类”，`url` 指向相应总览。`term.count` 是当前条目的全部已发布文章数，`term.url` 始终指向该条目第一页。所有 URL 均相对当前输出页，包含编码，可直接用于 `href`。`site.tags`、`site.categories` 始终是全站数据，不受当前条目或分页切片限制；其 `count` 同样是已发布文章数。
+
+其他页面上的 `terms` 为空数组，`taxonomy` 的三个文本字段为空字符串，`term` 的名称与 URL 为空、数量为 `0`。当前条目页的 `page.tags`、`page.categories` 也为空；它们只描述当前文章。
+
+总览布局可以这样写：
+
+```html
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ taxonomy.title }}</h1>
+<ul>
+{% for entry in terms %}
+  <li><a href="{{ entry.url }}">{{ entry.name }}</a>（{{ entry.count }}）</li>
+{% endfor %}
+</ul>
+{% endblock %}
+```
+
+条目布局可以复用已有文章列表和分页组件，也可以独立编写：
+
+```html
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ taxonomy.url }}">全部{{ taxonomy.title }}</a>
+<h1>{{ term.name }}</h1>
+<p>{{ term.count }} 篇文章</p>
+{% for post in posts %}
+  <article><a href="{{ post.url }}">{{ post.title }}</a></article>
+{% endfor %}
+{% if pagination.next_url != "" %}
+<a rel="next" href="{{ pagination.next_url }}">下一页</a>
+{% endif %}
+{% endblock %}
+```
+
+文章布局可循环 `page.tags`、`page.categories`，列表卡片可循环 `post.tags`、`post.categories`。标签链接可添加 `rel="tag"`。这些名称自动 HTML 转义，URL 不应再次交给 `url()`。全站导航可以用 `url("tags/")` 和 `url("categories/")`，但要先确认相应 `site` 数组非空，避免指向未生成的总览。
+
+条目列表与首页共用 `paginate_by` 和文章排序；新增条目输出也参与冲突检查、旧产物清理与 sitemap。主题可以显示标签云、分类导航或文章徽标；本轮只提供标签和扁平分类，未提供自定义 slug、层级分类或其他 taxonomy 类型。
 
 ## 主题参数
 
@@ -342,13 +404,14 @@ bio = "记录图形学与日常开发"
 
 ### 内置字段校验
 
-TOML front matter 的根级只接受 `title`、`date`、`description`、`draft`、`layout`、`extra`。未知键会提示将自定义数据移入 `[extra]`；重复键、TOML 语法错误及字段类型错误都会中止构建，并保留上次成功输出。语法错误包含源文档路径及行列位置。
+TOML front matter 的根级只接受 `title`、`date`、`description`、`draft`、`layout`、`tags`、`categories`、`extra`。未知键会提示将自定义数据移入 `[extra]`；重复键、TOML 语法错误及字段类型错误都会中止构建，并保留上次成功输出。语法错误包含源文档路径及行列位置。
 
 - `title` 必须是非空字符串。
 - 文章的 `date` 必填，独立页面可省略；提供时必须是有效的 `YYYY-MM-DD` 字符串或 TOML 本地日期，不接受日期时间。
 - `description` 如提供必须是字符串，可以为空。
 - `layout` 如提供必须是非空字符串，路径仍受主题目录边界约束。
 - `draft` 如提供必须是布尔值。
+- `tags`、`categories` 如提供必须是字符串数组，仅用于文章，条目名称规则见[技术写作](writing.md#标签与分类)。
 - `extra` 如提供必须是表；表内字段由主题定义，仍要求值能转换为上述模板数据类型。
 
 已有 `---` 包裹的简单 `key: value` 文稿继续支持，它不是完整 YAML，不提供嵌套数据；没有自定义数据的文稿无需迁移。`init` 与 `new` 统一生成 TOML 格式。
@@ -405,7 +468,7 @@ layout = "special/project.html"
 项目介绍。
 ```
 
-`layout` 可用于文章与独立页面，相对 `layouts/`，必须包含完整文件名。省略时分别使用 `post.html` 与 `page.html`。不存在、为空、重复或越界的路径会导致构建失败，并报告源文档。选择布局不改变文章分类、输出地址、排序或草稿规则。
+`layout` 可用于文章与独立页面，相对 `layouts/`，必须包含完整文件名。省略时分别使用 `post.html` 与 `page.html`。不存在、为空、重复或越界的路径会导致构建失败，并报告源文档。选择布局不改变文稿类型、标签与分类、输出地址、排序或草稿规则。
 
 ## 从旧主题迁移
 
@@ -449,7 +512,7 @@ mizuki serve --base-url /blog/
 mizuki build --base-url https://example.com/blog/
 ```
 
-检查首页、嵌套页面、主题资源、站内链接与章节跳转。站点有分页或归档时，检查它们的布局和相对地址。改变布尔参数、嵌套表和数组，确认默认值与覆盖行为符合主题说明。
+检查首页、嵌套页面、主题资源、站内链接与章节跳转。站点有分页、归档、标签或分类时，检查它们的布局和相对地址，包括中文与特殊字符名称、条目分页及计数。改变布尔参数、嵌套表和数组，确认默认值与覆盖行为符合主题说明。
 
 故意写错一个模板，确认构建报出具体路径，旧网页仍在；修复后确认预览恢复。正文与标题中加入引号、尖括号和 `{{ example }}`，确认普通文本正确转义，正文 HTML 正常输出，示例中的模板语法保持字面内容。
 

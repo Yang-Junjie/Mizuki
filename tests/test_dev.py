@@ -161,6 +161,41 @@ class DevTests(BuilderFixture):
         self.wait_for(lambda: not (self.output / "download.bin").exists(), "asset deletion")
         self.assert_no_temporary_directories()
 
+    def test_taxonomy_metadata_reloads_encoded_routes_and_removes_stale_pages(self):
+        self.start("serve", "--base-url", "/blog/", path="/blog/")
+        _, response = self.stream(path="/blog/__mizuki/events")
+        initial = self.event(response)
+        article = self.content / "posts/first.md"
+
+        def tag(name):
+            article.write_text('+++\ntitle = "Tagged article"\ndate = "2026-11-22"\n'
+                               f'tags = ["{name}"]\ncategories = ["Notes"]\n+++\nBody.',
+                               encoding="utf-8")
+
+        tag("C++")
+        self.wait_for(lambda: self.http_contains("/blog/tags/C%2B%2B/", "Tagged article"),
+                      "encoded tag page")
+        self.assertTrue(self.http_contains("/blog/categories/Notes/", "Tagged article"))
+        self.assertTrue(self.http_contains("/blog/posts/first.html", '../tags/C%2B%2B/'))
+        self.assertGreater(self.event(response), initial)
+        tag("New")
+        self.wait_for(lambda: self.http_contains("/blog/tags/New/", "Tagged article")
+                      and self.request("/blog/tags/C%2B%2B/")[0] == 404, "tag rename")
+        before, version = self.snapshot(), self.version("/blog/")
+        tag("../escape")
+        self.wait_for(lambda: "invalid term name" in self.logs(), "invalid tag diagnostic")
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(self.version("/blog/"), version)
+        self.assertTrue(self.http_contains("/blog/tags/New/", "Tagged article"))
+        tag("Recovered")
+        self.wait_for(lambda: self.http_contains("/blog/tags/Recovered/", "Tagged article")
+                      and self.request("/blog/tags/New/")[0] == 404, "tag recovery")
+        self.assertGreater(self.version("/blog/"), version)
+        article.unlink()
+        self.wait_for(lambda: self.request("/blog/tags/")[0] == 404
+                      and self.request("/blog/categories/")[0] == 404, "empty taxonomy cleanup")
+        self.assert_no_temporary_directories()
+
     def test_preview_http_static_head_errors_and_sse(self):
         (self.content / "binary.bin").write_bytes(b"\x00\xff\x01\x02")
         (self.content / "中文 space.txt").write_text("UTF-8 resource", encoding="utf-8")

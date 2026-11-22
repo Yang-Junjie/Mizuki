@@ -70,6 +70,41 @@ std::vector<fs::path> regular_files(fs::path const& directory) {
     return files;
 }
 
+std::vector<PlannedListing> plan_listings(fs::path const& directory, std::size_t total,
+                                          std::size_t paginate_by) {
+    auto const page_count =
+        total == 0 || paginate_by == 0 ? std::size_t{1} : 1 + (total - 1) / paginate_by;
+    std::vector<PlannedListing> listings;
+    for (std::size_t index = 0; index < page_count; ++index) {
+        auto const offset = index * paginate_by;
+        auto const count = paginate_by == 0 ? total : std::min(paginate_by, total - offset);
+        auto const output = index == 0
+                                ? directory / "index.html"
+                                : directory / "page" / std::to_string(index + 1) / "index.html";
+        listings.push_back({output, offset, count});
+    }
+    return listings;
+}
+
+PlannedTaxonomy plan_taxonomy(std::string name, std::string title,
+                              std::vector<ContentSummary> const& articles,
+                              std::vector<std::string> ContentSummary::*field,
+                              std::size_t paginate_by) {
+    std::map<std::string, std::vector<std::size_t>> groups;
+    for (std::size_t index = 0; index < articles.size(); ++index) {
+        for (auto const& term : articles[index].*field) {
+            groups[term].push_back(index);
+        }
+    }
+    PlannedTaxonomy taxonomy{std::move(name), std::move(title), {}};
+    for (auto& [term, indices] : groups) {
+        auto listings = plan_listings(fs::path(taxonomy.name) / path_from_utf8(term),
+                                      indices.size(), paginate_by);
+        taxonomy.terms.push_back({term, std::move(indices), std::move(listings)});
+    }
+    return taxonomy;
+}
+
 } // namespace
 
 BuildPlan plan_build(SiteConfig const& options) {
@@ -116,7 +151,8 @@ BuildPlan plan_build(SiteConfig const& options) {
         auto& summaries =
             page.kind == DocumentKind::Article ? plan.articles : plan.independent_pages;
         summaries.push_back({metadata.title, metadata.date, path_to_utf8(page.output),
-                             metadata.description, metadata.extra});
+                             metadata.description, metadata.extra, metadata.tags,
+                             metadata.categories});
     }
     std::ranges::sort(plan.articles, [](ContentSummary const& left, ContentSummary const& right) {
         if (left.date != right.date) {
@@ -125,20 +161,25 @@ BuildPlan plan_build(SiteConfig const& options) {
         return left.url < right.url;
     });
     std::ranges::sort(plan.independent_pages, {}, &ContentSummary::url);
-    auto const total = plan.articles.size();
-    auto const page_count = total == 0 || options.paginate_by == 0
-                                ? std::size_t{1}
-                                : 1 + (total - 1) / options.paginate_by;
-    for (std::size_t index = 0; index < page_count; ++index) {
-        auto const offset = index * options.paginate_by;
-        auto const count =
-            options.paginate_by == 0 ? total : std::min(options.paginate_by, total - offset);
-        auto const path = index == 0 ? fs::path("index.html")
-                                     : fs::path("page") / std::to_string(index + 1) / "index.html";
-        if (index != 0) {
-            reserve(path, "generated pagination page " + std::to_string(index + 1));
+    plan.listings = plan_listings({}, plan.articles.size(), options.paginate_by);
+    for (std::size_t index = 1; index < plan.listings.size(); ++index) {
+        reserve(plan.listings[index].output,
+                "generated pagination page " + std::to_string(index + 1));
+    }
+    plan.taxonomies.push_back(
+        plan_taxonomy("tags", "标签", plan.articles, &ContentSummary::tags, options.paginate_by));
+    plan.taxonomies.push_back(plan_taxonomy("categories", "分类", plan.articles,
+                                            &ContentSummary::categories, options.paginate_by));
+    for (auto const& taxonomy : plan.taxonomies) {
+        if (taxonomy.terms.empty()) {
+            continue;
         }
-        plan.listings.push_back({path, offset, count});
+        reserve(fs::path(taxonomy.name) / "index.html", "generated " + taxonomy.name + " overview");
+        for (auto const& term : taxonomy.terms) {
+            for (auto const& listing : term.listings) {
+                reserve(listing.output, "generated " + taxonomy.name + " term '" + term.name + "'");
+            }
+        }
     }
     if (options.archives) {
         reserve("archives/index.html", "generated article archive");
