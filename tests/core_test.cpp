@@ -85,8 +85,8 @@ void template_failure_has_context_and_does_not_poison_later_renders() {
     auto const error =
         expect_failure([&] { theme.render("layout.html", nlohmann::json::object()); });
     require(error.find("title") != std::string::npos, "Error omitted missing variable");
-    require(error.find(mizuki::path_to_utf8(path)) != std::string::npos,
-            "Error omitted template path");
+    auto const resolved_path = mizuki::path_to_utf8(std::filesystem::weakly_canonical(path));
+    require(error.find(resolved_path) != std::string::npos, "Error omitted template path");
     require(theme.render("layout.html", {{"title", "Still usable"}}) == "Still usable",
             "Failed rendering poisoned the template");
     auto const load_error = expect_failure([&] { theme.render("missing.html", {}); });

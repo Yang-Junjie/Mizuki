@@ -163,7 +163,7 @@ class BuilderTests(BuilderFixture):
                 else:
                     layout.write_text(invalid)
                 error = self.build(success=False)
-                self.assertIn(layout.as_posix(), error)
+                self.assertIn(layout.resolve().as_posix(), error)
                 self.assertIn("Failed to load template" if invalid is None else "variable 'missing_value' not found", error)
                 if invalid is not None:
                     self.assertIn("missing_value", error)
@@ -181,7 +181,7 @@ class BuilderTests(BuilderFixture):
                 else:
                     layout.write_text(invalid, encoding="utf-8")
                 error = self.build(success=False)
-                self.assertIn(layout.as_posix(), error)
+                self.assertIn(layout.resolve().as_posix(), error)
                 self.assertIn("Failed to load template" if invalid is None else "variable 'missing_value' not found", error)
                 if invalid is not None:
                     self.assertIn("missing_value", error)
