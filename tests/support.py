@@ -57,13 +57,14 @@ class BuilderFixture(unittest.TestCase):
         else:
             path.write_text(text, encoding="utf-8")
 
-    def build(self, *, success=True, output=None, cwd=None):
+    def build(self, *args, success=True, output=None, cwd=None):
         result = subprocess.run(
             [
                 str(self.binary), "build",
                 "--content", str(self.content),
                 "--theme", str(self.theme),
                 "--output", str(self.output if output is None else output),
+                *args,
             ],
             cwd=self.root if cwd is None else cwd,
             capture_output=True,

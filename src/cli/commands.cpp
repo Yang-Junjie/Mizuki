@@ -31,6 +31,7 @@ enum class ParseResult { Ok, Exit, Error };
 struct CliOptions {
     Command command{Command::Build};
     ConfigRequest config;
+    bool stats{false};
     int port{kDefaultPort};
     std::filesystem::path directory;
     NewContent content;
@@ -71,6 +72,7 @@ void print_usage(std::optional<Command> command = std::nullopt) {
                  "  --theme DIR    Theme directory (default: themes/default)\n"
                  "  --output DIR   Generated site directory (default: dist)\n"
                  "  --base-url URL Published site URL or path (default: /)\n"
+                 "  --stats        Report phase timings for build\n"
                  "  --port PORT    Preview port for serve (default: 3939)\n"
                  "\n"
                  "Global options:\n"
@@ -163,6 +165,10 @@ ParseResult parse_args(int argc, char** argv, CliOptions& cli) {
             cli.content.draft = true;
             continue;
         }
+        if (cli.command == Command::Build && option == "--stats") {
+            cli.stats = true;
+            continue;
+        }
         bool const is_port = cli.command == Command::Serve && option == "--port";
         bool const is_config = !creating_site && option == "--config";
         bool const is_content = !creating_site && option == "--content";
@@ -214,10 +220,18 @@ ParseResult parse_args(int argc, char** argv, CliOptions& cli) {
     return ParseResult::Ok;
 }
 
-int run_build(SiteConfig const& options) {
+int run_build(SiteConfig const& options, bool show_stats) {
     auto const result = build_site(options);
     spdlog::info("Built {} page(s), copied {} asset(s) -> {}", result.pages_built,
                  result.assets_copied, path_to_utf8(options.output_dir));
+    if (show_stats) {
+        auto const& time = result.timings;
+        spdlog::info(
+            "Build timings (ms): planning {:.2f}, pages {:.2f}, assets {:.2f}, output comparison "
+            "{:.2f}, publishing {:.2f}, total {:.2f}",
+            time.planning.count(), time.pages.count(), time.assets.count(), time.comparison.count(),
+            time.publishing.count(), time.total.count());
+    }
     return 0;
 }
 
@@ -249,7 +263,7 @@ int run_cli(int argc, char** argv) {
         case Command::Watch:
             return watch(cli.config);
         case Command::Build:
-            return run_build(load_config(cli.config));
+            return run_build(load_config(cli.config), cli.stats);
         }
     } catch (std::exception const& error) {
         auto const action = cli.command == Command::Init  ? "Site initialization"

@@ -1,6 +1,9 @@
 #pragma once
 
+#include "build/plan.hpp"
+
 #include <filesystem>
+#include <span>
 
 namespace mizuki {
 
@@ -14,7 +17,7 @@ public:
     OutputTransaction& operator=(OutputTransaction const&) = delete;
 
     std::filesystem::path const& stage() const;
-    bool matches_published() const;
+    bool matches_published(std::span<PlannedAsset const> pending_copies = {}) const;
     void commit();
 
 private:

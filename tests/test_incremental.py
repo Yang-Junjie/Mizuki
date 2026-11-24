@@ -25,13 +25,20 @@ class IncrementalTests(BuilderFixture):
     def test_body_metadata_and_shared_template_changes(self):
         self.write_page("posts/second.md", "Second post", "Second body.", date="2026-11-17")
         self.configure()
+        initial = self.build()
         self.assertIn("2 rendered, 0 reused (Markdown); 5 rendered, 0 reused (HTML); published",
-                      self.build())
+                      initial)
+        self.assertNotIn("Build timings", initial)
         homepage = self.output / "index.html"
         os.utime(homepage, (1_700_000_000, 1_700_000_000))
         timestamp = homepage.stat().st_mtime_ns
+        unchanged = self.build("--stats")
         self.assertIn("0 rendered, 2 reused (Markdown); 0 rendered, 5 reused (HTML); output unchanged",
-                      self.build())
+                      unchanged)
+        self.assertRegex(
+            unchanged, r"Build timings \(ms\): planning \d+\.\d+, pages \d+\.\d+, "
+            r"assets \d+\.\d+, output comparison \d+\.\d+, publishing \d+\.\d+, total \d+\.\d+"
+        )
         self.assertEqual(homepage.stat().st_mtime_ns, timestamp)
 
         self.write_page("posts/first.md", "First post", "## Heading\n\nEdited body.")
@@ -94,6 +101,29 @@ class IncrementalTests(BuilderFixture):
         self.set_config('[build]\nincremental = "true"\n')
         self.assertIn("'build.incremental' must be a boolean", self.build(success=False))
         self.assertEqual(self.snapshot(), before)
+
+    def test_plain_assets_skip_staging_only_when_bytes_and_paths_match(self):
+        self.configure()
+        source = self.content / "files/nested/value.bin"
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b"before")
+        self.build()
+        output = self.output / "files/nested/value.bin"
+
+        self.assertIn("copied 0 asset(s)", self.build())
+        original_time = source.stat()
+        source.write_bytes(b"edited")
+        os.utime(source, ns=(original_time.st_atime_ns, original_time.st_mtime_ns))
+        self.assertIn("; published", self.build())
+        self.assertEqual(output.read_bytes(), b"edited")
+
+        output.write_bytes(b"broken")
+        self.assertIn("; published", self.build())
+        self.assertEqual(output.read_bytes(), b"edited")
+        source.unlink()
+        self.assertIn("; published", self.build())
+        self.assertFalse((self.output / "files").exists())
+        self.assert_matches_full_build()
 
 
 if __name__ == "__main__":

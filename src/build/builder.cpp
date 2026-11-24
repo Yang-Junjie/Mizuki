@@ -21,6 +21,7 @@
 #include <exception>
 #include <span>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace mizuki {
@@ -152,11 +153,18 @@ std::string render_term(SiteConfig const& config, BuildPlan const& plan,
     return cache.page(theme, "term.html", context);
 }
 
-} // namespace
+using BuildClock = std::chrono::steady_clock;
 
-BuildStats build_site(SiteConfig const& config) {
+BuildStats build_site_staged(SiteConfig const& config, BuildClock::time_point start) {
+    BuildStats stats;
+    auto previous = start;
+    auto const elapsed = [&previous] {
+        auto const now = BuildClock::now();
+        return now - std::exchange(previous, now);
+    };
     auto const output_path = validate_output_path(config);
     auto const plan = plan_build(config);
+    stats.timings.planning = elapsed();
     Theme theme(config.theme_dir, config.base_url.path);
     auto const extra = merge_extra(theme.defaults(), config.site.extra);
     OutputTransaction output(output_path);
@@ -227,25 +235,48 @@ BuildStats build_site(SiteConfig const& config) {
         spdlog::info("Skipping RSS, sitemap and canonical URLs: set base_url to a complete HTTP(S) "
                      "address to enable them");
     }
+    stats.timings.pages = elapsed();
+    if (config.incremental && !config.images.compress) {
+        stats.published = !output.matches_published(plan.assets);
+        stats.timings.comparison = elapsed();
+    }
     ImageWriter images(config.images,
                        config.images.compress ? cache_path(config, output_path, "images")
                                               : fs::path{},
                        output.stage());
-    for (auto const& asset : plan.assets) {
-        auto const destination = output.stage() / asset.output;
-        fs::create_directories(destination.parent_path());
-        images.write(asset.source, destination);
+    if (stats.published) {
+        for (auto const& asset : plan.assets) {
+            auto const destination = output.stage() / asset.output;
+            fs::create_directories(destination.parent_path());
+            images.write(asset.source, destination);
+        }
+        stats.assets_copied = plan.assets.size();
     }
-    bool const published = !config.incremental || !output.matches_published();
-    if (published) {
+    stats.timings.assets = elapsed();
+    if (config.incremental && config.images.compress) {
+        stats.published = !output.matches_published();
+        stats.timings.comparison = elapsed();
+    }
+    if (stats.published) {
         output.commit();
     }
+    stats.timings.publishing = elapsed();
     if (config.incremental) {
-        cache.log_summary(published);
+        cache.log_summary(stats.published);
     }
     images.log_summary();
-    return {plan.pages.size() + plan.listings.size() + (config.archives ? 1 : 0) + taxonomy_pages,
-            plan.assets.size(), published};
+    stats.pages_built =
+        plan.pages.size() + plan.listings.size() + (config.archives ? 1 : 0) + taxonomy_pages;
+    return stats;
+}
+
+} // namespace
+
+BuildStats build_site(SiteConfig const& config) {
+    auto const start = BuildClock::now();
+    auto result = build_site_staged(config, start);
+    result.timings.total = BuildClock::now() - start;
+    return result;
 }
 
 } // namespace mizuki
