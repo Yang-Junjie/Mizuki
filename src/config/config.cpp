@@ -97,10 +97,49 @@ MarkdownOptions parse_markdown(toml::node const& node) {
     return options;
 }
 
+void parse_build(toml::node const& node, SiteConfig& config) {
+    auto const* build = node.as_table();
+    if (!build) {
+        throw std::runtime_error("Configuration 'build' must be a table");
+    }
+    check_keys(*build, {"incremental", "images"});
+    if (auto const* value = build->get("incremental")) {
+        if (!value->is_boolean()) {
+            throw std::runtime_error("Configuration 'build.incremental' must be a boolean");
+        }
+        config.incremental = *value->value<bool>();
+    }
+    auto& options = config.images;
+    auto const* images_node = build->get("images");
+    if (!images_node) {
+        return;
+    }
+    auto const* images = images_node->as_table();
+    if (!images) {
+        throw std::runtime_error("Configuration 'build.images' must be a table");
+    }
+    check_keys(*images, {"compress", "quality"});
+    if (auto const* enabled = images->get("compress")) {
+        if (!enabled->is_boolean()) {
+            throw std::runtime_error("Configuration 'build.images.compress' must be a boolean");
+        }
+        options.compress = *enabled->value<bool>();
+    }
+    if (auto const* quality = images->get("quality")) {
+        auto const value = quality->value<std::int64_t>();
+        if (!quality->is_integer() || !value || *value < 1 || *value > 100) {
+            throw std::runtime_error(
+                "Configuration 'build.images.quality' must be an integer from 1 to 100");
+        }
+        options.quality = static_cast<int>(*value);
+    }
+}
+
 void read_config_file(SiteConfig& config) {
     auto const table = toml::parse(read_file(config.config_file));
-    check_keys(table, {"title", "description", "author", "language", "content", "theme", "output",
-                       "navigation", "base_url", "paginate_by", "archives", "extra", "markdown"});
+    check_keys(table,
+               {"title", "description", "author", "language", "content", "theme", "output",
+                "navigation", "base_url", "paginate_by", "archives", "extra", "markdown", "build"});
     config.base_url = parse_base_url(string_value(table, "base_url", "/"));
     if (auto const* node = table.get("paginate_by")) {
         auto const value = node->value<std::int64_t>();
@@ -118,6 +157,9 @@ void read_config_file(SiteConfig& config) {
     }
     if (auto const* node = table.get("markdown")) {
         config.markdown = parse_markdown(*node);
+    }
+    if (auto const* node = table.get("build")) {
+        parse_build(*node, config);
     }
     auto& site = config.site;
     if (auto const* extra = table.get("extra")) {

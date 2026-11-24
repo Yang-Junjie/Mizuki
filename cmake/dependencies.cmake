@@ -2,7 +2,9 @@ include(FetchContent)
 set(FETCHCONTENT_QUIET OFF CACHE BOOL "Show FetchContent download and population logs")
 
 # Source releases carry the same dependency sources used for their binaries.
-foreach(dependency spdlog md4c efsw httplib tomlplusplus json inja)
+set(mizuki_dependencies spdlog md4c efsw httplib tomlplusplus json inja
+    libjpeg_turbo libwebp picosha2)
+foreach(dependency IN LISTS mizuki_dependencies)
     string(TOUPPER "${dependency}" dependency_upper)
     set(bundled_source "${PROJECT_SOURCE_DIR}/third_party/${dependency}")
     if(EXISTS "${bundled_source}/CMakeLists.txt" AND
@@ -18,3 +20,5 @@ include(${CMAKE_CURRENT_LIST_DIR}/third_party_httplib.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/third_party_tomlplusplus.cmake)
 
 include(${CMAKE_CURRENT_LIST_DIR}/third_party_templates.cmake)
+
+include(${CMAKE_CURRENT_LIST_DIR}/third_party_images.cmake)

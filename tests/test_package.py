@@ -16,7 +16,16 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 
-DEPENDENCIES = ("spdlog", "md4c", "efsw", "httplib", "tomlplusplus", "json", "inja")
+DEPENDENCIES = (
+    "spdlog", "md4c", "efsw", "httplib", "tomlplusplus", "json", "inja",
+    "libjpeg_turbo", "libwebp", "picosha2",
+)
+LICENSE_FILENAMES = {
+    "md4c": "LICENSE.md",
+    "json": "LICENSE.MIT",
+    "libjpeg_turbo": "LICENSE.md",
+    "libwebp": "COPYING",
+}
 
 
 def check(condition, message):
@@ -49,7 +58,9 @@ def check_runtime_dependencies(binary):
         output = run("dumpbin", "/dependents", binary)
         dependencies = set(re.findall(r"^\s+(\S+[.]dll)\s*$", output, re.MULTILINE | re.IGNORECASE))
         allowed = {"kernel32.dll", "user32.dll", "advapi32.dll", "ws2_32.dll",
-                   "shell32.dll", "iphlpapi.dll", "bcrypt.dll", "ntdll.dll"}
+                   "shell32.dll", "iphlpapi.dll", "bcrypt.dll", "ntdll.dll",
+                   # The statically linked MSVC STL can import WaitOnAddress from Windows.
+                   "api-ms-win-core-synch-l1-2-0.dll"}
         check(dependencies and {name.lower() for name in dependencies} <= allowed,
               f"Unexpected Windows runtime dependencies:\n{output}")
     else:
@@ -207,8 +218,15 @@ def check_binary_package(package_root):
     examples_source = Path(__file__).resolve().parents[1] / "examples"
     expected.update("share/mizuki/examples/" + path.relative_to(examples_source).as_posix()
                     for path in examples_source.rglob("*") if path.is_file())
-    expected.update(f"share/mizuki/licenses/{name}/LICENSE" + ({"md4c": ".md", "json": ".MIT"}.get(name, ""))
+    expected.update(f"share/mizuki/licenses/{name}/{LICENSE_FILENAMES.get(name, 'LICENSE')}"
                     for name in DEPENDENCIES)
+    expected.update(
+        {
+            "share/mizuki/licenses/libjpeg_turbo/README.ijg",
+            "share/mizuki/licenses/libwebp/PATENTS",
+            "share/mizuki/licenses/zlib/LICENSE",
+        }
+    )
     actual = {path.relative_to(package_root).as_posix() for path in package_root.rglob("*")
               if path.is_file()}
     check(actual == expected, f"Unexpected package contents: {actual ^ expected}")

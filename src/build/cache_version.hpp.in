@@ -1,0 +1,7 @@
+#pragma once
+
+namespace mizuki {
+
+inline constexpr char render_cache_version[] = "@MIZUKI_RENDER_CACHE_VERSION@";
+
+} // namespace mizuki

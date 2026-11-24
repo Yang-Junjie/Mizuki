@@ -1,6 +1,8 @@
 #include "build/builder.hpp"
 
 #include "build/context.hpp"
+#include "build/images.hpp"
+#include "build/incremental.hpp"
 #include "build/links.hpp"
 #include "build/output_transaction.hpp"
 #include "build/paths.hpp"
@@ -35,10 +37,11 @@ nlohmann::json collection_context(SiteConfig const& config, BuildPlan const& pla
     return context;
 }
 
-std::string render_page(PlannedPage const& page, Theme& theme, SiteConfig const& config,
-                        BuildPlan const& plan, nlohmann::json const& extra) {
+std::string render_page(PlannedPage const& page, Theme& theme, RenderCache& cache,
+                        SiteConfig const& config, BuildPlan const& plan,
+                        nlohmann::json const& extra) {
     try {
-        auto const markdown = render_markdown(page.document.body, config.markdown);
+        auto const markdown = cache.markdown(page.document.body, config.markdown);
         auto const html =
             rewrite_document_links(markdown.html, [&](std::string_view url, HtmlLinkKind kind) {
                 return resolve_link(url, page.relative, plan,
@@ -67,7 +70,7 @@ std::string render_page(PlannedPage const& page, Theme& theme, SiteConfig const&
         auto const layout = metadata.layout.empty()
                                 ? (page.kind == DocumentKind::Article ? "post.html" : "page.html")
                                 : metadata.layout;
-        return theme.render(layout, context);
+        return cache.page(theme, layout, context);
     } catch (std::exception const& error) {
         throw std::runtime_error("Failed to render " + path_to_utf8(page.source) + ": " +
                                  error.what());
@@ -75,7 +78,7 @@ std::string render_page(PlannedPage const& page, Theme& theme, SiteConfig const&
 }
 
 std::string render_listing(SiteConfig const& config, BuildPlan const& plan, std::size_t index,
-                           Theme& theme, nlohmann::json const& extra) {
+                           Theme& theme, RenderCache& cache, nlohmann::json const& extra) {
     auto const& listing = plan.listings[index];
     auto const articles = std::span(plan.articles).subspan(listing.offset, listing.count);
     auto context = collection_context(config, plan, listing.output, extra);
@@ -84,11 +87,11 @@ std::string render_listing(SiteConfig const& config, BuildPlan const& plan, std:
         index == 0 ? config.site.title
                    : config.site.title + " · 第 " + std::to_string(index + 1) + " 页";
     context["pagination"] = pagination_data(plan.listings, index);
-    return theme.render("home.html", context);
+    return cache.page(theme, "home.html", context);
 }
 
 std::string render_archives(SiteConfig const& config, BuildPlan const& plan, Theme& theme,
-                            nlohmann::json const& extra) {
+                            RenderCache& cache, nlohmann::json const& extra) {
     fs::path const output = "archives/index.html";
     auto context = collection_context(config, plan, output, extra);
     context["page"]["kind"] = "archives";
@@ -104,7 +107,7 @@ std::string render_archives(SiteConfig const& config, BuildPlan const& plan, The
             {{"year", year}, {"posts", summary_data(articles.first(count), output)}});
         articles = articles.subspan(count);
     }
-    return theme.render("archives.html", context);
+    return cache.page(theme, "archives.html", context);
 }
 
 nlohmann::json taxonomy_context(SiteConfig const& config, BuildPlan const& plan,
@@ -118,19 +121,19 @@ nlohmann::json taxonomy_context(SiteConfig const& config, BuildPlan const& plan,
 }
 
 std::string render_taxonomy(SiteConfig const& config, BuildPlan const& plan,
-                            PlannedTaxonomy const& taxonomy, Theme& theme,
+                            PlannedTaxonomy const& taxonomy, Theme& theme, RenderCache& cache,
                             nlohmann::json const& extra) {
     auto const output = fs::path(taxonomy.name) / "index.html";
     auto context = taxonomy_context(config, plan, taxonomy, output, extra);
     context["page"]["kind"] = "taxonomy";
     context["page"]["title"] = taxonomy.title;
     context["terms"] = term_data(taxonomy, output);
-    return theme.render("taxonomy.html", context);
+    return cache.page(theme, "taxonomy.html", context);
 }
 
 std::string render_term(SiteConfig const& config, BuildPlan const& plan,
                         PlannedTaxonomy const& taxonomy, PlannedTerm const& term, std::size_t index,
-                        Theme& theme, nlohmann::json const& extra) {
+                        Theme& theme, RenderCache& cache, nlohmann::json const& extra) {
     auto const& listing = term.listings[index];
     auto context = taxonomy_context(config, plan, taxonomy, listing.output, extra);
     context["page"]["kind"] = "term";
@@ -146,7 +149,7 @@ std::string render_term(SiteConfig const& config, BuildPlan const& plan,
         context["posts"].push_back(summary_value(plan.articles[article], listing.output));
     }
     context["pagination"] = pagination_data(term.listings, index);
-    return theme.render("term.html", context);
+    return cache.page(theme, "term.html", context);
 }
 
 } // namespace
@@ -157,20 +160,22 @@ BuildStats build_site(SiteConfig const& config) {
     Theme theme(config.theme_dir, config.base_url.path);
     auto const extra = merge_extra(theme.defaults(), config.site.extra);
     OutputTransaction output(output_path);
+    RenderCache cache(config.incremental ? cache_path(config, output_path, "render") : fs::path{},
+                      output.stage());
     for (auto const& page : plan.pages) {
         auto const destination = output.stage() / page.output;
         fs::create_directories(destination.parent_path());
-        write_file(destination, render_page(page, theme, config, plan, extra));
+        write_file(destination, render_page(page, theme, cache, config, plan, extra));
     }
     for (std::size_t index = 0; index < plan.listings.size(); ++index) {
         auto const destination = output.stage() / plan.listings[index].output;
         fs::create_directories(destination.parent_path());
-        write_file(destination, render_listing(config, plan, index, theme, extra));
+        write_file(destination, render_listing(config, plan, index, theme, cache, extra));
     }
     if (config.archives) {
         auto const destination = output.stage() / "archives/index.html";
         fs::create_directories(destination.parent_path());
-        write_file(destination, render_archives(config, plan, theme, extra));
+        write_file(destination, render_archives(config, plan, theme, cache, extra));
     }
     std::size_t taxonomy_pages = 0;
     for (auto const& taxonomy : plan.taxonomies) {
@@ -179,13 +184,14 @@ BuildStats build_site(SiteConfig const& config) {
         }
         auto const destination = output.stage() / taxonomy.name / "index.html";
         fs::create_directories(destination.parent_path());
-        write_file(destination, render_taxonomy(config, plan, taxonomy, theme, extra));
+        write_file(destination, render_taxonomy(config, plan, taxonomy, theme, cache, extra));
         ++taxonomy_pages;
         for (auto const& term : taxonomy.terms) {
             for (std::size_t index = 0; index < term.listings.size(); ++index) {
                 auto const path = output.stage() / term.listings[index].output;
                 fs::create_directories(path.parent_path());
-                write_file(path, render_term(config, plan, taxonomy, term, index, theme, extra));
+                write_file(path,
+                           render_term(config, plan, taxonomy, term, index, theme, cache, extra));
                 ++taxonomy_pages;
             }
         }
@@ -221,14 +227,25 @@ BuildStats build_site(SiteConfig const& config) {
         spdlog::info("Skipping RSS, sitemap and canonical URLs: set base_url to a complete HTTP(S) "
                      "address to enable them");
     }
+    ImageWriter images(config.images,
+                       config.images.compress ? cache_path(config, output_path, "images")
+                                              : fs::path{},
+                       output.stage());
     for (auto const& asset : plan.assets) {
         auto const destination = output.stage() / asset.output;
         fs::create_directories(destination.parent_path());
-        fs::copy_file(asset.source, destination);
+        images.write(asset.source, destination);
     }
-    output.commit();
+    bool const published = !config.incremental || !output.matches_published();
+    if (published) {
+        output.commit();
+    }
+    if (config.incremental) {
+        cache.log_summary(published);
+    }
+    images.log_summary();
     return {plan.pages.size() + plan.listings.size() + (config.archives ? 1 : 0) + taxonomy_pages,
-            plan.assets.size()};
+            plan.assets.size(), published};
 }
 
 } // namespace mizuki

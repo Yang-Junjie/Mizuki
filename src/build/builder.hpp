@@ -9,9 +9,10 @@ namespace mizuki {
 struct BuildStats {
     std::size_t pages_built{0};
     std::size_t assets_copied{0};
+    bool published{true};
 };
 
-// Returns only after the complete site has been published; failures throw.
+// Returns after publishing the complete site or confirming that it is unchanged.
 BuildStats build_site(SiteConfig const& config);
 
 } // namespace mizuki

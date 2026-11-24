@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config/images.hpp"
 #include "config/markdown.hpp"
 #include "util/url.hpp"
 
@@ -32,6 +33,8 @@ struct SiteConfig {
     std::filesystem::path config_file;
     SiteMetadata site;
     MarkdownOptions markdown;
+    ImageOptions images;
+    bool incremental{false};
     BaseUrl base_url;
     std::size_t paginate_by{0};
     bool archives{false};

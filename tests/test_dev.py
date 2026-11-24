@@ -296,6 +296,19 @@ class DevTests(BuilderFixture):
                       "directory deletion")
         self.assert_no_temporary_directories()
 
+    def test_incremental_preview_only_reloads_changed_output(self):
+        config = 'theme = "theme"\n[build]\nincremental = true\n'
+        self.configure(config)
+        self.start(configure=False)
+        initial = self.version()
+        self.configure(config + "# Editing a comment does not change the site.\n", atomic=True)
+        self.wait_for(lambda: "output unchanged" in self.logs(), "unchanged incremental build")
+        self.assertEqual(self.version(), initial, self.logs())
+
+        self.write_page("posts/first.md", "First post", "Updated body.", atomic=True)
+        self.wait_for_reload(initial)
+        self.assertTrue(self.http_contains("/posts/first.html", "Updated body."))
+
     def test_failed_build_keeps_served_output_and_sends_no_reload_then_recovers(self):
         self.start()
         _, response = self.stream(timeout=0.6)

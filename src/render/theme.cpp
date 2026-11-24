@@ -1,5 +1,6 @@
 #include "render/theme.hpp"
 
+#include "build/artifact_cache.hpp"
 #include "config/values.hpp"
 #include "util/file.hpp"
 #include "util/path.hpp"
@@ -19,10 +20,16 @@ namespace mizuki {
 namespace fs = std::filesystem;
 
 struct Theme::Impl {
+    struct TemplateSnapshot {
+        inja::Template parsed;
+        std::string fingerprint;
+    };
+
     fs::path root;
     nlohmann::json extra = nlohmann::json::object();
     inja::Environment environment;
-    std::map<fs::path, inja::Template> templates;
+    std::map<fs::path, TemplateSnapshot> templates;
+    std::map<std::string, TemplateSnapshot*> includes;
     std::vector<fs::path> loading;
     std::ostream* output{nullptr};
 
@@ -87,8 +94,11 @@ struct Theme::Impl {
         });
         environment.set_html_autoescape(true);
         environment.set_search_included_templates_in_files(false);
-        environment.set_include_callback(
-            [this](fs::path const&, std::string const& name) { return load(name); });
+        environment.set_include_callback([this](fs::path const&, std::string const& name) {
+            auto& included = load(name);
+            includes.emplace(name, &included);
+            return included.parsed;
+        });
         // Inja's void callbacks can write to the active render stream. Keeping this an
         // output function preserves automatic escaping for all ordinary expressions.
         environment.add_void_callback("html", 1, [this](inja::Arguments& arguments) {
@@ -115,7 +125,7 @@ struct Theme::Impl {
         return resolved;
     }
 
-    inja::Template const& load(std::string_view name) {
+    TemplateSnapshot& load(std::string_view name) {
         auto const path = resolve(name);
         if (auto const found = templates.find(path); found != templates.end()) {
             return found->second;
@@ -138,7 +148,8 @@ struct Theme::Impl {
         loading.push_back(path);
         try {
             auto parsed = environment.parse(source);
-            auto const inserted = templates.emplace(path, std::move(parsed)).first;
+            auto const inserted =
+                templates.emplace(path, TemplateSnapshot{std::move(parsed), {}}).first;
             loading.pop_back();
             return inserted->second;
         } catch (std::exception const& error) {
@@ -146,6 +157,37 @@ struct Theme::Impl {
             throw std::runtime_error("Failed to parse template " + path_to_utf8(path) + ": " +
                                      error.what());
         }
+    }
+
+    void append_dependencies(inja::BlockNode const& block, std::string& hashes) {
+        for (auto const& node : block.nodes) {
+            if (auto const* include = dynamic_cast<inja::IncludeStatementNode const*>(node.get())) {
+                hashes.append(fingerprint(*includes.at(include->file)));
+            } else if (auto const* parent =
+                           dynamic_cast<inja::ExtendsStatementNode const*>(node.get())) {
+                hashes.append(fingerprint(*includes.at(parent->file)));
+            } else if (auto const* loop = dynamic_cast<inja::ForStatementNode const*>(node.get())) {
+                append_dependencies(loop->body, hashes);
+            } else if (auto const* branch =
+                           dynamic_cast<inja::IfStatementNode const*>(node.get())) {
+                append_dependencies(branch->true_statement, hashes);
+                append_dependencies(branch->false_statement, hashes);
+            } else if (auto const* section =
+                           dynamic_cast<inja::BlockStatementNode const*>(node.get())) {
+                append_dependencies(section->block, hashes);
+            }
+        }
+    }
+
+    std::string const& fingerprint(TemplateSnapshot& snapshot) {
+        if (snapshot.fingerprint.empty()) {
+            // Inja skips the include callback for templates already in its storage.
+            // The parsed tree still records every include and extends statement.
+            auto hashes = sha256(snapshot.parsed.content);
+            append_dependencies(snapshot.parsed.root, hashes);
+            snapshot.fingerprint = sha256(hashes);
+        }
+        return snapshot.fingerprint;
     }
 };
 
@@ -157,8 +199,12 @@ nlohmann::json const& Theme::defaults() const {
     return impl_->extra;
 }
 
+std::string const& Theme::fingerprint(std::string_view layout) {
+    return impl_->fingerprint(impl_->load(layout));
+}
+
 std::string Theme::render(std::string_view layout, nlohmann::json const& context) {
-    auto const& parsed = impl_->load(layout);
+    auto const& parsed = impl_->load(layout).parsed;
     std::ostringstream result;
     impl_->output = &result;
     try {

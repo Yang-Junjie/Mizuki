@@ -14,6 +14,7 @@ public:
     OutputTransaction& operator=(OutputTransaction const&) = delete;
 
     std::filesystem::path const& stage() const;
+    bool matches_published() const;
     void commit();
 
 private:

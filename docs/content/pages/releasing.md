@@ -32,6 +32,8 @@ ctest --test-dir build/distribution --output-on-failure
 
 二进制包只有一个顶层目录，其中包含 `bin/mizuki` 或 `bin/mizuki.exe` 和 `share/mizuki/` 文档。依赖许可证直接取自本次构建使用的源码；fmt 的许可证从 spdlog 内置 fmt 头部提取。
 
+This software is based in part on the work of the Independent JPEG Group.
+
 `mizuki.package` 检查包内文件与运行库依赖，解压到构建目录之外，再运行 `--version`、`init`、`new`、`build` 和真实的 `serve`。测试覆盖中文路径、文章标题、草稿排除、RSS/sitemap、子路径预览和服务运行中创建文章。Linux 额外运行 `mizuki.source_package`，验证源码包离线重建。
 
 如果关闭了测试，也可以在构建完成后手动打包：

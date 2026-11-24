@@ -17,6 +17,7 @@ public:
     Theme& operator=(Theme const&) = delete;
 
     nlohmann::json const& defaults() const;
+    std::string const& fingerprint(std::string_view layout);
     std::string render(std::string_view layout, nlohmann::json const& context);
 
 private:

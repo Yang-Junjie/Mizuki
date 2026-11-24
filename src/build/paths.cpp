@@ -80,4 +80,19 @@ fs::path validate_output_path(SiteConfig const& options) {
     return output;
 }
 
+fs::path cache_path(SiteConfig const& options, fs::path const& output, std::string_view name) {
+    std::error_code error;
+    auto const cache = fs::weakly_canonical(output.parent_path() / ".cache/mizuki" / name, error);
+    if (error || is_within(cache, output) || is_within(output, cache)) {
+        return {};
+    }
+    for (auto const& source : {options.content_dir, options.theme_dir}) {
+        auto const canonical_source = fs::canonical(source);
+        if (is_within(cache, canonical_source) || is_within(canonical_source, cache)) {
+            return {};
+        }
+    }
+    return cache;
+}
+
 } // namespace mizuki

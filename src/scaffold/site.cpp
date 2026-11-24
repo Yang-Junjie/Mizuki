@@ -89,7 +89,7 @@ void init_site(fs::path const& directory) {
     files.write(target / "mizuki.toml", kConfig);
     files.write(target / "content/posts/welcome.md", welcome);
     files.write(target / "content/pages/about.md", kAbout);
-    files.write(target / ".gitignore", "/dist/\n");
+    files.write(target / ".gitignore", "/dist/\n/.cache/\n");
     for (auto const& file : kEmbeddedTheme) {
         std::string content;
         for (auto const chunk : file.chunks) {

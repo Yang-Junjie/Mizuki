@@ -10,6 +10,16 @@ add_test(NAME mizuki.builder
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_builder.py"
             "$<TARGET_FILE:mizuki>")
 
+add_test(NAME mizuki.images
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_images.py"
+            "$<TARGET_FILE:mizuki>")
+set_tests_properties(mizuki.images PROPERTIES TIMEOUT 60 ENVIRONMENT "PYTHONUTF8=1")
+
+add_test(NAME mizuki.incremental
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_incremental.py"
+            "$<TARGET_FILE:mizuki>")
+set_tests_properties(mizuki.incremental PROPERTIES TIMEOUT 60 ENVIRONMENT "PYTHONUTF8=1")
+
 add_test(NAME mizuki.site
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_site.py"
             "$<TARGET_FILE:mizuki>")

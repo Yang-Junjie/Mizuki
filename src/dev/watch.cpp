@@ -72,10 +72,13 @@ void WatchSession::build_if_changed(OnBuild const& on_build) {
         // Keep watching failed candidates so fixing a new input triggers recovery.
         update_watchers(candidate);
         auto const stats = build_site(candidate);
+        bool const preview_changed =
+            !published_config_ || !same_path(candidate.output_dir, published_config_->output_dir) ||
+            candidate.base_url.path != published_config_->base_url.path;
         published_config_ = candidate;
         spdlog::info("Built {} page(s), copied {} asset(s) -> {}", stats.pages_built,
                      stats.assets_copied, path_to_utf8(candidate.output_dir));
-        if (on_build) {
+        if (on_build && (stats.published || preview_changed)) {
             on_build(*published_config_);
         }
     } catch (std::exception const& error) {

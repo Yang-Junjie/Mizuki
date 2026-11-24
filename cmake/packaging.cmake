@@ -12,7 +12,7 @@ install(DIRECTORY "${PROJECT_SOURCE_DIR}/examples/"
     DESTINATION "${distribution_docs}/examples" COMPONENT mizuki)
 
 set(CPACK_SOURCE_INSTALLED_DIRECTORIES "${PROJECT_SOURCE_DIR};/")
-foreach(dependency spdlog md4c efsw httplib tomlplusplus json inja)
+foreach(dependency IN LISTS mizuki_dependencies)
     FetchContent_GetProperties(${dependency} SOURCE_DIR dependency_source)
     if(NOT IS_DIRECTORY "${dependency_source}")
         message(FATAL_ERROR "Missing source for distribution dependency: ${dependency}")
@@ -21,6 +21,8 @@ foreach(dependency spdlog md4c efsw httplib tomlplusplus json inja)
         set(dependency_license "${dependency_source}/LICENSE")
     elseif(EXISTS "${dependency_source}/LICENSE.md")
         set(dependency_license "${dependency_source}/LICENSE.md")
+    elseif(EXISTS "${dependency_source}/COPYING")
+        set(dependency_license "${dependency_source}/COPYING")
     elseif(EXISTS "${dependency_source}/LICENSE.MIT")
         set(dependency_license "${dependency_source}/LICENSE.MIT")
     else()
@@ -32,6 +34,15 @@ foreach(dependency spdlog md4c efsw httplib tomlplusplus json inja)
     install(DIRECTORY "${dependency_source}/"
         DESTINATION "third_party/${dependency}" COMPONENT mizuki_sources EXCLUDE_FROM_ALL
         PATTERN ".git" EXCLUDE PATTERN "__pycache__" EXCLUDE PATTERN "*.pyc" EXCLUDE)
+    if(dependency STREQUAL "libjpeg_turbo")
+        install(FILES "${dependency_source}/README.ijg"
+            DESTINATION "${distribution_docs}/licenses/${dependency}" COMPONENT mizuki)
+        install(FILES "${dependency_source}/src/spng/zlib/LICENSE"
+            DESTINATION "${distribution_docs}/licenses/zlib" COMPONENT mizuki)
+    elseif(dependency STREQUAL "libwebp")
+        install(FILES "${dependency_source}/PATENTS"
+            DESTINATION "${distribution_docs}/licenses/${dependency}" COMPONENT mizuki)
+    endif()
     if(dependency STREQUAL "spdlog")
         # fmt's bundled headers contain its complete license in the first comment.
         file(READ "${dependency_source}/include/spdlog/fmt/bundled/format.h" fmt_header)

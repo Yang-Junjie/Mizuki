@@ -4,8 +4,12 @@
 
 #include <spdlog/spdlog.h>
 
+#include <array>
 #include <atomic>
 #include <chrono>
+#include <cstring>
+#include <fstream>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -50,6 +54,50 @@ void cleanup_directory(fs::path const& path) {
     }
 }
 
+bool files_match(fs::path const& left, fs::path const& right) {
+    if (fs::file_size(left) != fs::file_size(right)) {
+        return false;
+    }
+    std::ifstream a(left, std::ios::binary);
+    std::ifstream b(right, std::ios::binary);
+    if (!a || !b) {
+        return false;
+    }
+    std::array<char, 64 * 1024> a_bytes;
+    std::array<char, 64 * 1024> b_bytes;
+    do {
+        a.read(a_bytes.data(), a_bytes.size());
+        b.read(b_bytes.data(), b_bytes.size());
+        if (a.gcount() != b.gcount() ||
+            std::memcmp(a_bytes.data(), b_bytes.data(), static_cast<std::size_t>(a.gcount())) !=
+                0 ||
+            a.bad() || b.bad() || a.eof() != b.eof()) {
+            return false;
+        }
+    } while (a && b);
+    return a.eof() && b.eof();
+}
+
+bool trees_match(fs::path const& stage, fs::path const& published) {
+    if (fs::symlink_status(published).type() != fs::file_type::directory) {
+        return false;
+    }
+    std::size_t entries = 0;
+    for (auto const& expected : fs::recursive_directory_iterator(stage)) {
+        auto const target = published / expected.path().lexically_relative(stage);
+        auto const type = fs::symlink_status(target).type();
+        if (type != expected.symlink_status().type() ||
+            (type == fs::file_type::regular && !files_match(expected.path(), target))) {
+            return false;
+        }
+        ++entries;
+    }
+    // Any additional published entry, including an empty directory, must be removed.
+    auto const existing = fs::recursive_directory_iterator(published);
+    return static_cast<std::size_t>(std::distance(existing, fs::recursive_directory_iterator{})) ==
+           entries;
+}
+
 } // namespace
 
 OutputTransaction::OutputTransaction(fs::path output) : output_(std::move(output)) {
@@ -63,6 +111,14 @@ OutputTransaction::~OutputTransaction() {
 
 fs::path const& OutputTransaction::stage() const {
     return stage_;
+}
+
+bool OutputTransaction::matches_published() const {
+    try {
+        return trees_match(stage_, output_);
+    } catch (fs::filesystem_error const&) {
+        return false;
+    }
 }
 
 void OutputTransaction::commit() {

@@ -62,7 +62,7 @@ class ScaffoldTests(unittest.TestCase):
             for p in (site / "themes/default").rglob("*") if p.is_file()
         }
         self.assertEqual(actual, expected)
-        self.assertEqual((site / ".gitignore").read_text(), "/dist/\n")
+        self.assertEqual((site / ".gitignore").read_text(), "/dist/\n/.cache/\n")
         self.command("build", cwd=site, binary=binary)
         for name in ("index.html", "archives/index.html", "posts/welcome.html", "pages/about.html",
                      "assets/css/style.css"):
