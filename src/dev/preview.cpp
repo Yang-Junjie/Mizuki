@@ -56,11 +56,69 @@ std::string inject_reload_script(std::string html, std::string_view local_path,
     const events = new EventSource(")";
     script += snapshot.base_path + "__mizuki/events";
     script += R"(");
+    const scrollKey = "__mizuki_reload_scroll";
+    let pendingScroll;
+    try {
+        const saved = sessionStorage.getItem(scrollKey);
+        if (saved !== null) {
+            sessionStorage.removeItem(scrollKey);
+            const position = JSON.parse(saved);
+            if (position.url === location.href &&
+                Number.isFinite(position.x) && Number.isFinite(position.y)) {
+                pendingScroll = position;
+            }
+        }
+    } catch {
+        // Storage can be unavailable in the browser.
+    }
+
+    if (pendingScroll) {
+        const controller = new AbortController();
+        const { signal } = controller;
+        let frame = 0;
+        const restore = () => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => {
+                window.scrollTo({ left: pendingScroll.x, top: pendingScroll.y, behavior: "instant" });
+            });
+        };
+        const layout = typeof ResizeObserver === "function" ? new ResizeObserver(restore) : null;
+        const deadline = setTimeout(stopRestoring, 1000);
+        function stopRestoring() {
+            pendingScroll = undefined;
+            controller.abort();
+            layout?.disconnect();
+            cancelAnimationFrame(frame);
+            clearTimeout(deadline);
+        }
+        for (const event of ["wheel", "touchstart", "pointerdown", "keydown"]) {
+            window.addEventListener(event, stopRestoring, { capture: true, passive: true, signal });
+        }
+        window.addEventListener("load", restore, { once: true, signal });
+        layout?.observe(document.body ?? document.documentElement);
+        restore();
+    }
+
     events.onmessage = (event) => {
         const published = JSON.parse(event.data);
         if (String(published.version) !== version) {
             events.close();
-            location.replace(published.base_path + page + location.search + location.hash);
+            const target = new URL(published.base_path + page + location.search + location.hash,
+                                   location.href);
+            try {
+                sessionStorage.setItem(scrollKey, JSON.stringify({
+                    url: target.href,
+                    x: pendingScroll?.x ?? window.scrollX,
+                    y: pendingScroll?.y ?? window.scrollY,
+                }));
+            } catch {
+                // Live reload still works without storage.
+            }
+            if (target.href === location.href) {
+                location.reload();
+            } else {
+                location.replace(target.href);
+            }
         }
     };
 })();
