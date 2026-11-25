@@ -170,6 +170,7 @@ my-theme/
 | `page.url` | 相对当前页的自身地址；列表页为目录形式 |
 | `page.canonical_url` | 配置完整域名时的规范地址，否则为空；列表页为目录形式 |
 | `page.headings` | 全部正文 h1–h6 标题，条目包含 `level`、`id`、`text`、`url` |
+| `page.word_count` | 文章页的正文字数 |
 | `page.features` | `code`、`math`、`footnotes`、`admonitions` 布尔值，表示当前正文含有相应标记；集合页均为 false |
 | `page.code_languages` | 代码块语言名称，按首次出现顺序去重，保留源语言与别名；集合页为空 |
 | `asset_base` | 相对当前页的主题资源目录，包含结尾 `/` |
@@ -182,7 +183,7 @@ my-theme/
 | `pagination.current_page`、`pagination.total_pages` | 从 1 开始的页码与总页数；非列表页均为 1 |
 | `pagination.previous_url`、`pagination.next_url` | 上一页与下一页地址，不存在时为空 |
 
-`site.posts`、`site.pages`、`posts` 与归档分组中的摘要使用同一字段结构：
+`site.posts`、`site.pages`、`posts` 与归档分组中的摘要共用以下字段：
 
 | 摘要字段 | 语义 |
 | --- | --- |
@@ -198,6 +199,8 @@ my-theme/
 `site.pages` 只收集 `content/pages/` 下已发布的 Markdown；文章、首页分页、归档、标签／分类页和复制的 HTML 资源均不在其中。草稿不出现在任何发布集合。排序比较的是未编码输出路径的 UTF-8 字节，独立页面不按日期或标题排序；需要手动排序的导航可以继续使用配置中的 `navigation`。
 
 根级 `posts` 只在首页及其分页、标签／分类条目页及其分页提供当前切片；在详情页、独立页面、归档和总览页为空。`archives` 只在归档页提供完整年份分组，在其他入口为空。其他入口读取最近文章时应使用 `site.posts`。
+
+首页和首页分页中的 `posts` 另外提供整数 `post.word_count`，与对应文章页的 `page.word_count` 一致。统计包含 Markdown 正文、正文标题和可见的链接标签。每个汉字和每个拉丁字母各计一字，数字、标点、代码、已解析的数学公式、图片替代文本和链接地址略过。
 
 全站摘要、当前列表、导航、分页和资源地址均已适配当前输出路径及中文、空格编码，包括深层正文、后续分页与归档页。直接使用相应 URL 字段，不再拼接 `site.base_path`，也不再传给 `url()`。`site.extra`、`page.extra` 和摘要 `extra` 中的自定义字符串与 URL 不自动改写。模板中的站内资源可通过 `url()` 生成地址，详见下文。
 

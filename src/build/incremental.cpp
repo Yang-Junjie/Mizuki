@@ -30,7 +30,8 @@ Json encode_markdown(RenderedMarkdown const& markdown) {
     return {{"html", markdown.html},
             {"headings", std::move(headings)},
             {"features", {features.code, features.math, features.footnotes, features.admonitions}},
-            {"languages", markdown.code_languages}};
+            {"languages", markdown.code_languages},
+            {"word_count", markdown.word_count}};
 }
 
 RenderedMarkdown decode_markdown(std::string_view bytes) {
@@ -41,6 +42,7 @@ RenderedMarkdown decode_markdown(std::string_view bytes) {
     markdown.features = {features.at(0).get<bool>(), features.at(1).get<bool>(),
                          features.at(2).get<bool>(), features.at(3).get<bool>()};
     markdown.code_languages = entry.at("languages").get<std::vector<std::string>>();
+    markdown.word_count = entry.at("word_count").get<std::size_t>();
     for (auto const& heading : entry.at("headings")) {
         markdown.headings.push_back({heading.at(0).get<unsigned>(),
                                      heading.at(1).get<std::string>(),

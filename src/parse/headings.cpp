@@ -236,25 +236,32 @@ std::string decode_text(std::string_view text) {
     return result;
 }
 
+std::pair<unsigned, std::size_t> utf8_character(std::string_view text) {
+    auto const lead = static_cast<unsigned char>(text.front());
+    if (lead < 0xC2 || lead > 0xF4) {
+        return {lead < 0x80 ? lead : 0xFFFDu, 1};
+    }
+    auto const length = std::size_t{lead < 0xE0 ? 2u : lead < 0xF0 ? 3u : 4u};
+    if (length > text.size()) {
+        return {0xFFFDu, 1};
+    }
+    unsigned point = lead & (0x7Fu >> length);
+    for (std::size_t i = 1; i < length; ++i) {
+        auto const next = static_cast<unsigned char>(text[i]);
+        if ((next & 0xC0) != 0x80) {
+            return {0xFFFDu, 1};
+        }
+        point = (point << 6) | (next & 0x3F);
+    }
+    return {point, length};
+}
+
 // The same whitespace handling is used for labels and IDs, without locale-dependent casing.
 std::string normalize_text(std::string_view text) {
     std::string result;
     bool pending_space = false;
     for (std::size_t i = 0; i < text.size();) {
-        auto length = std::size_t{1};
-        auto code = static_cast<unsigned char>(text[i]);
-        unsigned point = code;
-        if (code >= 0xC2 && code <= 0xF4) {
-            length = code < 0xE0 ? 2 : code < 0xF0 ? 3 : 4;
-            if (i + length <= text.size()) {
-                point = code & (0x7F >> length);
-                for (std::size_t j = 1; j < length; ++j) {
-                    point = (point << 6) | (static_cast<unsigned char>(text[i + j]) & 0x3F);
-                }
-            } else {
-                length = 1;
-            }
-        }
+        auto const [point, length] = utf8_character(text.substr(i));
         bool const whitespace =
             (point >= 9 && point <= 13) || point == 32 || point == 0x85 || point == 0xA0 ||
             point == 0x1680 || (point >= 0x2000 && point <= 0x200A) || point == 0x2028 ||
@@ -315,11 +322,79 @@ bool heading(Tag const& tag) {
     return tag.name.size() == 2 && tag.name[0] == 'h' && tag.name[1] >= '1' && tag.name[1] <= '6';
 }
 
+bool han_character(unsigned point) {
+    return point == 0x3007 || (point >= 0x3400 && point <= 0x4DBF) ||
+           (point >= 0x4E00 && point <= 0x9FFF) || (point >= 0xF900 && point <= 0xFAFF) ||
+           (point >= 0x20000 && point <= 0x2EE5F) || (point >= 0x2F800 && point <= 0x2FA1F) ||
+           (point >= 0x30000 && point <= 0x323AF);
+}
+
+bool latin_letter(unsigned point) {
+    return (point >= 'A' && point <= 'Z') || (point >= 'a' && point <= 'z') ||
+           (point >= 0xC0 && point <= 0x24F && point != 0xD7 && point != 0xF7) ||
+           (point >= 0x1E00 && point <= 0x1EFF);
+}
+
+bool address_link(std::string_view html, Tag const& tag) {
+    auto const href = attribute(html, tag, "href");
+    auto const end = html.find('<', tag.end);
+    if (!href || end == std::string_view::npos || !html.substr(end).starts_with("</a>")) {
+        return false;
+    }
+    auto const address = decode_text(href->value);
+    auto const label = decode_text(html.substr(tag.end, end - tag.end));
+    return has_url_scheme(address) &&
+           (label == address || address == "mailto:" + label || address == "http://" + label ||
+            address == "https://" + label);
+}
+
+std::size_t count_text_characters(std::string_view html, std::vector<Tag> const& tags) {
+    std::size_t count = 0;
+    auto const add_text = [&](std::string_view text) {
+        std::string decoded;
+        if (text.find('&') != std::string_view::npos) {
+            decoded = decode_text(text);
+            text = decoded;
+        }
+        while (!text.empty()) {
+            auto const [point, length] = utf8_character(text);
+            text.remove_prefix(length);
+            count += han_character(point) || latin_letter(point);
+        }
+    };
+
+    std::size_t offset = 0;
+    unsigned excluded = 0;
+    bool in_address = false;
+    for (auto const& tag : tags) {
+        if (!excluded && !in_address) {
+            add_text(html.substr(offset, tag.start - offset));
+        }
+        offset = tag.end;
+        auto const& name = tag.name;
+        if (name == "code" || name == "pre" || name == "x-equation" || name == "math") {
+            if (tag.closing) {
+                excluded -= excluded != 0;
+            } else if (!html.substr(tag.start, tag.end - tag.start).ends_with("/>")) {
+                ++excluded;
+            }
+        } else if (name == "a" &&
+                   (in_address || (!tag.closing && !excluded && address_link(html, tag)))) {
+            in_address = !tag.closing;
+        }
+    }
+    if (!excluded && !in_address) {
+        add_text(html.substr(offset));
+    }
+    return count;
+}
+
 } // namespace
 
 RenderedMarkdown analyze_markdown_html(std::string_view html) {
     auto const tags = scan_tags(html);
     RenderedMarkdown result;
+    result.word_count = count_text_characters(html, tags);
     unsigned pre_depth = 0;
     unsigned code_depth = 0;
     std::unordered_set<std::string> languages;

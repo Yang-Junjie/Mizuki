@@ -19,6 +19,7 @@
 #include <spdlog/spdlog.h>
 
 #include <exception>
+#include <map>
 #include <span>
 #include <stdexcept>
 #include <utility>
@@ -27,6 +28,8 @@
 namespace mizuki {
 namespace fs = std::filesystem;
 namespace {
+
+using WordCounts = std::map<std::string, std::size_t>;
 
 nlohmann::json collection_context(SiteConfig const& config, BuildPlan const& plan,
                                   fs::path const& output, nlohmann::json const& extra) {
@@ -40,7 +43,7 @@ nlohmann::json collection_context(SiteConfig const& config, BuildPlan const& pla
 
 std::string render_page(PlannedPage const& page, Theme& theme, RenderCache& cache,
                         SiteConfig const& config, BuildPlan const& plan,
-                        nlohmann::json const& extra) {
+                        nlohmann::json const& extra, WordCounts& word_counts) {
     try {
         auto const markdown = cache.markdown(page.document.body, config.markdown);
         auto const html =
@@ -61,6 +64,10 @@ std::string render_page(PlannedPage const& page, Theme& theme, RenderCache& cach
         data["description"] =
             metadata.description.empty() ? config.site.description : metadata.description;
         data["content"] = html;
+        if (page.kind == DocumentKind::Article) {
+            data["word_count"] = markdown.word_count;
+            word_counts.emplace(path_to_utf8(page.output), markdown.word_count);
+        }
         data["headings"] = heading_data(markdown.headings);
         data["features"] = {{"code", markdown.features.code},
                             {"math", markdown.features.math},
@@ -79,11 +86,16 @@ std::string render_page(PlannedPage const& page, Theme& theme, RenderCache& cach
 }
 
 std::string render_listing(SiteConfig const& config, BuildPlan const& plan, std::size_t index,
-                           Theme& theme, RenderCache& cache, nlohmann::json const& extra) {
+                           Theme& theme, RenderCache& cache, nlohmann::json const& extra,
+                           WordCounts const& word_counts) {
     auto const& listing = plan.listings[index];
     auto const articles = std::span(plan.articles).subspan(listing.offset, listing.count);
     auto context = collection_context(config, plan, listing.output, extra);
-    context["posts"] = summary_data(articles, listing.output);
+    for (auto const& article : articles) {
+        auto post = summary_value(article, listing.output);
+        post["word_count"] = word_counts.at(article.url);
+        context["posts"].push_back(std::move(post));
+    }
     context["page"]["title"] =
         index == 0 ? config.site.title
                    : config.site.title + " · 第 " + std::to_string(index + 1) + " 页";
@@ -170,15 +182,17 @@ BuildStats build_site_staged(SiteConfig const& config, BuildClock::time_point st
     OutputTransaction output(output_path);
     RenderCache cache(config.incremental ? cache_path(config, output_path, "render") : fs::path{},
                       output.stage());
+    WordCounts word_counts;
     for (auto const& page : plan.pages) {
         auto const destination = output.stage() / page.output;
         fs::create_directories(destination.parent_path());
-        write_file(destination, render_page(page, theme, cache, config, plan, extra));
+        write_file(destination, render_page(page, theme, cache, config, plan, extra, word_counts));
     }
     for (std::size_t index = 0; index < plan.listings.size(); ++index) {
         auto const destination = output.stage() / plan.listings[index].output;
         fs::create_directories(destination.parent_path());
-        write_file(destination, render_listing(config, plan, index, theme, cache, extra));
+        write_file(destination,
+                   render_listing(config, plan, index, theme, cache, extra, word_counts));
     }
     if (config.archives) {
         auto const destination = output.stage() / "archives/index.html";

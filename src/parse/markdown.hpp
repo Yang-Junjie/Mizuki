@@ -3,6 +3,7 @@
 #include "config/markdown.hpp"
 #include "parse/front_matter.hpp"
 
+#include <cstddef>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -30,6 +31,7 @@ struct RenderedMarkdown {
     std::vector<Heading> headings;
     MarkdownFeatures features;
     std::vector<std::string> code_languages;
+    std::size_t word_count{0};
 };
 
 RenderedMarkdown render_markdown(std::string_view body, MarkdownOptions const& options = {});

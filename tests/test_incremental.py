@@ -12,6 +12,7 @@ class IncrementalTests(BuilderFixture):
     def set_config(self, settings):
         (self.root / "mizuki.toml").write_text(
             'base_url = "https://example.test/blog/"\narchives = true\npaginate_by = 1\n'
+            "[markdown]\nmath = true\n"
             + settings, encoding="utf-8"
         )
 
@@ -42,7 +43,7 @@ class IncrementalTests(BuilderFixture):
         self.assertEqual(homepage.stat().st_mtime_ns, timestamp)
 
         self.write_page("posts/first.md", "First post", "## Heading\n\nEdited body.")
-        self.assertIn("1 rendered, 1 reused (Markdown); 1 rendered, 4 reused (HTML); published",
+        self.assertIn("1 rendered, 1 reused (Markdown); 2 rendered, 3 reused (HTML); published",
                       self.build())
         article = (self.output / "posts/first.html").read_text(encoding="utf-8")
         self.assertIn('id="heading"', article)
@@ -77,6 +78,29 @@ class IncrementalTests(BuilderFixture):
         self.build()
         self.assertFalse((self.output / "posts/second.html").exists())
         self.assertFalse((self.output / "page/2/index.html").exists())
+        self.assert_matches_full_build()
+
+    def test_word_counts_match_between_article_and_listing(self):
+        self.configure()
+        (self.theme / "layouts/post.html").write_text("Article count {{ page.word_count }}",
+                                                      encoding="utf-8")
+        (self.theme / "layouts/home.html").write_text(
+            "{% for post in posts %}{{ post.title }} count {{ post.word_count }}{% endfor %}",
+            encoding="utf-8",
+        )
+        self.write_page("posts/second.md", "Second post", "Second.",
+                        date="2026-11-17")
+        self.write_page("posts/first.md", "First post",
+                        "## 中文 Word\n\npath**tracing** [可见 label](https://example.test/a) "
+                        "`inline code` $x + y$. https://example.test/b\n\n"
+                        "&#x5B57; café &copy; WebGL2\n\n```cpp\nint ignored;\n```\n")
+        self.build()
+        article = self.output / "posts/first.html"
+        listing = self.output / "page/2/index.html"
+        self.assertEqual(article.read_text(encoding="utf-8"), "Article count 34")
+        self.assertEqual(listing.read_text(encoding="utf-8"), "First post count 34")
+        self.assertIn("0 rendered, 2 reused (Markdown); 0 rendered, 5 reused (HTML)",
+                      self.build())
         self.assert_matches_full_build()
 
     def test_cache_and_output_damage_recover(self):
