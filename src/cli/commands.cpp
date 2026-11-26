@@ -32,6 +32,7 @@ struct CliOptions {
     Command command{Command::Build};
     ConfigRequest config;
     bool stats{false};
+    bool write_output{false};
     int port{kDefaultPort};
     std::filesystem::path directory;
     NewContent content;
@@ -58,26 +59,29 @@ void print_usage(std::optional<Command> command = std::nullopt) {
                      "  --help, -h          Show this help\n";
         return;
     }
-    std::cout << "Usage: mizuki <build|watch|serve|init|new> [options]\n"
-                 "\n"
-                 "  init DIRECTORY Create a site in an absent or empty directory\n"
-                 "  new PATH       Create a Markdown article or page (--title required)\n"
-                 "  build          Build the site once\n"
-                 "  watch          Rebuild when content or theme files change\n"
-                 "  serve          Watch and serve the site locally\n"
-                 "\n"
-                 "Build, watch and serve options:\n"
-                 "  --config FILE  Site configuration (default: mizuki.toml, optional)\n"
-                 "  --content DIR  Content directory (default: content)\n"
-                 "  --theme DIR    Theme directory (default: themes/default)\n"
-                 "  --output DIR   Generated site directory (default: dist)\n"
-                 "  --base-url URL Published site URL or path (default: /)\n"
-                 "  --stats        Report phase timings for build\n"
-                 "  --port PORT    Preview port for serve (default: 3939)\n"
-                 "\n"
-                 "Global options:\n"
-                 "  --version, -V  Show the program version\n"
-                 "  --help, -h     Show help; use init --help or new --help for creation options\n";
+    std::cout
+        << "Usage: mizuki <build|watch|serve|init|new> [options]\n"
+           "\n"
+           "  init DIRECTORY Create a site in an absent or empty directory\n"
+           "  new PATH       Create a Markdown article or page (--title required)\n"
+           "  build          Build the site once\n"
+           "  watch          Rebuild when content or theme files change\n"
+           "  serve          Watch and serve the site locally\n"
+           "\n"
+           "Build, watch and serve options:\n"
+           "  --config FILE  Site configuration (default: mizuki.toml, optional)\n"
+           "  --content DIR  Content directory (default: content)\n"
+           "  --theme DIR    Theme directory (default: themes/default)\n"
+           "  --output DIR   Generated site directory (default: dist)\n"
+           "  --base-url URL Published site URL or path (default: /)\n"
+           "  --stats        Report phase timings for build\n"
+           "  --port PORT    Preview port for serve (default: 3939)\n"
+           "  --no-image-compression  Skip image compression in serve\n"
+           "  --write-output          Write preview builds to the configured output directory\n"
+           "\n"
+           "Global options:\n"
+           "  --version, -V  Show the program version\n"
+           "  --help, -h     Show help; use init --help or new --help for creation options\n";
 }
 
 std::optional<Command> parse_command(std::string_view name) {
@@ -167,6 +171,14 @@ ParseResult parse_args(int argc, char** argv, CliOptions& cli) {
         }
         if (cli.command == Command::Build && option == "--stats") {
             cli.stats = true;
+            continue;
+        }
+        if (cli.command == Command::Serve && option == "--no-image-compression") {
+            cli.config.disable_image_compression = true;
+            continue;
+        }
+        if (cli.command == Command::Serve && option == "--write-output") {
+            cli.write_output = true;
             continue;
         }
         bool const is_port = cli.command == Command::Serve && option == "--port";
@@ -259,7 +271,8 @@ int run_cli(int argc, char** argv) {
             return 0;
         }
         case Command::Serve:
-            return serve(cli.config, cli.port);
+            return serve(cli.config, cli.port,
+                         cli.write_output || cli.config.output_dir.has_value());
         case Command::Watch:
             return watch(cli.config);
         case Command::Build:

@@ -165,62 +165,40 @@ std::string render_term(SiteConfig const& config, BuildPlan const& plan,
     return cache.page(theme, "term.html", context);
 }
 
-using BuildClock = std::chrono::steady_clock;
-
-BuildStats build_site_staged(SiteConfig const& config, BuildClock::time_point start) {
-    BuildStats stats;
-    auto previous = start;
-    auto const elapsed = [&previous] {
-        auto const now = BuildClock::now();
-        return now - std::exchange(previous, now);
-    };
-    auto const output_path = validate_output_path(config);
-    auto const plan = plan_build(config);
-    stats.timings.planning = elapsed();
+template <class Write>
+std::size_t generate_pages(SiteConfig const& config, BuildPlan const& plan, RenderCache& cache,
+                           Write const& write) {
     Theme theme(config.theme_dir, config.base_url.path);
     auto const extra = merge_extra(theme.defaults(), config.site.extra);
-    OutputTransaction output(output_path);
-    RenderCache cache(config.incremental ? cache_path(config, output_path, "render") : fs::path{},
-                      output.stage());
     WordCounts word_counts;
     for (auto const& page : plan.pages) {
-        auto const destination = output.stage() / page.output;
-        fs::create_directories(destination.parent_path());
-        write_file(destination, render_page(page, theme, cache, config, plan, extra, word_counts));
+        write(page.output, render_page(page, theme, cache, config, plan, extra, word_counts));
     }
     for (std::size_t index = 0; index < plan.listings.size(); ++index) {
-        auto const destination = output.stage() / plan.listings[index].output;
-        fs::create_directories(destination.parent_path());
-        write_file(destination,
-                   render_listing(config, plan, index, theme, cache, extra, word_counts));
+        write(plan.listings[index].output,
+              render_listing(config, plan, index, theme, cache, extra, word_counts));
     }
     if (config.archives) {
-        auto const destination = output.stage() / "archives/index.html";
-        fs::create_directories(destination.parent_path());
-        write_file(destination, render_archives(config, plan, theme, cache, extra));
+        write("archives/index.html", render_archives(config, plan, theme, cache, extra));
     }
     std::size_t taxonomy_pages = 0;
     for (auto const& taxonomy : plan.taxonomies) {
         if (taxonomy.terms.empty()) {
             continue;
         }
-        auto const destination = output.stage() / taxonomy.name / "index.html";
-        fs::create_directories(destination.parent_path());
-        write_file(destination, render_taxonomy(config, plan, taxonomy, theme, cache, extra));
+        write(fs::path(taxonomy.name) / "index.html",
+              render_taxonomy(config, plan, taxonomy, theme, cache, extra));
         ++taxonomy_pages;
         for (auto const& term : taxonomy.terms) {
             for (std::size_t index = 0; index < term.listings.size(); ++index) {
-                auto const path = output.stage() / term.listings[index].output;
-                fs::create_directories(path.parent_path());
-                write_file(path,
-                           render_term(config, plan, taxonomy, term, index, theme, cache, extra));
+                write(term.listings[index].output,
+                      render_term(config, plan, taxonomy, term, index, theme, cache, extra));
                 ++taxonomy_pages;
             }
         }
     }
     if (!config.base_url.origin.empty()) {
-        write_file(output.stage() / "rss.xml",
-                   render_rss(config.site, config.base_url, plan.articles));
+        write("rss.xml", render_rss(config.site, config.base_url, plan.articles));
         std::vector<std::string> urls{published_url(config.base_url, "")};
         for (std::size_t index = 1; index < plan.listings.size(); ++index) {
             auto const path = path_to_utf8(plan.listings[index].output.parent_path()) + "/";
@@ -244,11 +222,35 @@ BuildStats build_site_staged(SiteConfig const& config, BuildClock::time_point st
                 }
             }
         }
-        write_file(output.stage() / "sitemap.xml", render_sitemap(urls));
+        write("sitemap.xml", render_sitemap(urls));
     } else {
         spdlog::info("Skipping RSS, sitemap and canonical URLs: set base_url to a complete HTTP(S) "
                      "address to enable them");
     }
+    return plan.pages.size() + plan.listings.size() + (config.archives ? 1 : 0) + taxonomy_pages;
+}
+
+using BuildClock = std::chrono::steady_clock;
+
+BuildStats build_site_staged(SiteConfig const& config, BuildClock::time_point start) {
+    BuildStats stats;
+    auto previous = start;
+    auto const elapsed = [&previous] {
+        auto const now = BuildClock::now();
+        return now - std::exchange(previous, now);
+    };
+    auto const output_path = validate_output_path(config);
+    auto const plan = plan_build(config);
+    stats.timings.planning = elapsed();
+    OutputTransaction output(output_path);
+    RenderCache cache(config.incremental ? cache_path(config, output_path, "render") : fs::path{},
+                      output.stage());
+    stats.pages_built =
+        generate_pages(config, plan, cache, [&](fs::path const& path, std::string const& contents) {
+            auto const destination = output.stage() / path;
+            fs::create_directories(destination.parent_path());
+            write_file(destination, contents);
+        });
     stats.timings.pages = elapsed();
     if (config.incremental && !config.images.compress) {
         stats.published = !output.matches_published(plan.assets);
@@ -279,8 +281,6 @@ BuildStats build_site_staged(SiteConfig const& config, BuildClock::time_point st
         cache.log_summary(stats.published);
     }
     images.log_summary();
-    stats.pages_built =
-        plan.pages.size() + plan.listings.size() + (config.archives ? 1 : 0) + taxonomy_pages;
     return stats;
 }
 
@@ -291,6 +291,73 @@ BuildStats build_site(SiteConfig const& config) {
     auto result = build_site_staged(config, start);
     result.timings.total = BuildClock::now() - start;
     return result;
+}
+
+PreviewAsset::~PreviewAsset() {
+    if (!cached.empty()) {
+        std::error_code error;
+        fs::remove(cached, error);
+    }
+}
+
+PreviewBuild build_preview(SiteConfig const& config, fs::path const& storage,
+                           std::shared_ptr<PreviewFiles const> const& previous,
+                           std::set<fs::path> const& changed) {
+    auto const plan = plan_build(config);
+    auto const stamp = std::to_string(BuildClock::now().time_since_epoch().count());
+    RenderCache cache(cache_path(config, validate_output_path(config), "render"),
+                      storage.filename().string() + "-" + stamp);
+    auto next = std::make_shared<PreviewFiles>();
+    BuildStats stats;
+    stats.pages_built =
+        generate_pages(config, plan, cache, [&](fs::path const& path, std::string contents) {
+            auto const key = path_to_utf8(path);
+            if (previous) {
+                auto const found = previous->generated.find(key);
+                if (found != previous->generated.end() && *found->second == contents) {
+                    next->generated.emplace(key, found->second);
+                    return;
+                }
+            }
+            next->generated.emplace(key, std::make_shared<std::string const>(std::move(contents)));
+        });
+    for (auto const& asset : plan.assets) {
+        auto const key = path_to_utf8(asset.output);
+        auto const source = fs::absolute(asset.source).lexically_normal();
+        std::shared_ptr<PreviewAsset const> old;
+        if (previous) {
+            auto const found = previous->assets.find(key);
+            if (found != previous->assets.end()) {
+                old = found->second;
+            }
+        }
+        auto const modified = fs::last_write_time(source);
+        auto const size = fs::file_size(source);
+        if (old && old->source == source && old->modified == modified && old->size == size &&
+            !changed.contains(source)) {
+            next->assets.emplace(key, std::move(old));
+            continue;
+        }
+        auto copy = std::make_shared<PreviewAsset>();
+        copy->source = source;
+        copy->modified = modified;
+        copy->size = size;
+        copy->cached = storage / (stamp + "-" + std::to_string(stats.assets_copied));
+        fs::copy_file(source, copy->cached);
+        ++stats.assets_copied;
+        next->assets.emplace(key, std::move(copy));
+    }
+    for (auto const& path : plan.outputs) {
+        for (auto parent = path.parent_path(); !parent.empty(); parent = parent.parent_path()) {
+            if (!next->directories.emplace(path_to_utf8(parent)).second) {
+                break;
+            }
+        }
+    }
+    stats.published =
+        !previous || next->generated != previous->generated || next->assets != previous->assets;
+    cache.log_summary(stats.published);
+    return {stats.published ? std::move(next) : previous, stats};
 }
 
 } // namespace mizuki

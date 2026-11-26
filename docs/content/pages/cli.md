@@ -51,10 +51,12 @@ mizuki new posts/first.md --title "指定内容目录" --content manuscripts
 | `--config FILE` | `build`、`watch`、`serve`、`new` | 指定站点配置 |
 | `--content DIR` | `build`、`watch`、`serve`、`new` | 覆盖内容目录 |
 | `--theme DIR` | `build`、`watch`、`serve` | 覆盖主题目录 |
-| `--output DIR` | `build`、`watch`、`serve` | 覆盖输出目录 |
+| `--output DIR` | `build`、`watch`、`serve` | 覆盖输出目录，显式指定时预览也会写入该目录 |
 | `--base-url URL` | `build`、`watch`、`serve` | 覆盖发布地址或部署路径 |
 | `--stats` | `build` | 输出各构建阶段的耗时 |
 | `--port PORT` | `serve` | 预览端口，默认 `3939`，范围 1–65535 |
+| `--write-output` | `serve` | 将预览也写入配置的输出目录，沿用正式构建的发布流程 |
+| `--no-image-compression` | `serve` | 写盘预览也直接使用原图 |
 
 ```sh
 mizuki build --config sites/blog.toml
@@ -91,7 +93,9 @@ Output path conflict
 
 同样会拒绝 `content/index.html` 与生成首页冲突、内容资源与主题资源同名，以及文件与目录占用同一路径（如文件 `assets` 和资源 `assets/css/style.css`）。ASCII 字母仅大小写不同的目标也视为冲突，使构建结果可移至大小写不敏感的文件系统。资源没有隐式覆盖优先级；发现冲突后应重命名或移除其中一个来源。
 
-`build`、`watch` 和 `serve` 共用构建流程。需要发布时，先在输出目录旁组装完整站点，全部成功后再替换正式输出。启用增量构建且关闭图片压缩时，资源会直接和已发布文件比较，产物完全相同便跳过资源复制。删除、重命名文章、改为草稿或删除资源后，下一次成功构建会移除旧产物。解析、链接、渲染或复制失败时保留之前的输出。
+`build`、`watch` 和 `serve` 共用规划、链接校验和模板渲染。默认的 `serve` 在内存中保存生成的页面，静态资源使用独立的临时副本。只改正文时复用静态资源，改资源时更新对应副本。一次构建全部成功后才切换预览，失败时保留上一版。预览默认使用原图，正式输出由 `mizuki build` 生成。
+
+`build`、`watch` 和 `serve --write-output` 在输出目录旁组装完整站点，全部成功后再替换正式输出。启用增量构建且关闭图片压缩时，产物完全相同便跳过资源复制。删除、重命名文章、改为草稿或删除资源后，下一次成功构建会移除旧产物。
 
 **输出目录完全由 Mizuki 管理。** 手动放入的文件也会在下一次成功构建时消失。需要发布的文件应放入内容目录或主题 `assets/`。输出目录不能与内容或主题目录重叠，不能包含配置文件，不能是文件系统根目录、当前工作目录或其祖先，也不能是符号链接或普通文件。
 

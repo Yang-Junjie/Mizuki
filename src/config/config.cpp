@@ -208,6 +208,9 @@ SiteConfig load_config(ConfigRequest const& request) {
     if (request.base_url) {
         config.base_url = parse_base_url(*request.base_url);
     }
+    if (request.disable_image_compression) {
+        config.images.compress = false;
+    }
     return config;
 }
 

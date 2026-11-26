@@ -10,7 +10,7 @@ namespace mizuki {
 namespace fs = std::filesystem;
 
 LiveReload::LiveReload(fs::path const& output_dir, std::string base_path)
-    : published_{fs::absolute(output_dir), std::move(base_path), 0} {}
+    : published_{fs::absolute(output_dir), std::move(base_path), 0, {}} {}
 
 PreviewSnapshot LiveReload::snapshot() const {
     std::lock_guard lock(mutex_);
@@ -20,7 +20,15 @@ PreviewSnapshot LiveReload::snapshot() const {
 void LiveReload::notify_build(fs::path const& output_dir, std::string base_path) {
     {
         std::lock_guard lock(mutex_);
-        published_ = {fs::absolute(output_dir), std::move(base_path), published_.version + 1};
+        published_ = {fs::absolute(output_dir), std::move(base_path), published_.version + 1, {}};
+    }
+    changed_.notify_all();
+}
+
+void LiveReload::notify_preview(std::shared_ptr<PreviewFiles const> files, std::string base_path) {
+    {
+        std::lock_guard lock(mutex_);
+        published_ = {{}, std::move(base_path), published_.version + 1, std::move(files)};
     }
     changed_.notify_all();
 }

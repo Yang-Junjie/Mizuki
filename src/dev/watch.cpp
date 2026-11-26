@@ -23,18 +23,27 @@ bool same_path(fs::path const& left, fs::path const& right) {
 
 } // namespace
 
-WatchSession::WatchSession(ConfigRequest request) : request_(std::move(request)) {
+WatchSession::WatchSession(ConfigRequest request, Build build)
+    : request_(std::move(request)), build_(std::move(build)) {
     request_.config_file = fs::absolute(request_.config_file).lexically_normal();
     // Watch the parent so atomic saves, deletion and recreation are all observed.
     config_watcher_ = std::make_unique<FileWatcher>(
         request_.config_file.parent_path(),
         [this](fs::path const& path) {
             if (same_path(path, request_.config_file)) {
-                changed_.store(true);
+                mark_changed(path);
             }
         },
         WatchDepth::Directory);
     update_watchers(load_config(request_));
+}
+
+void WatchSession::mark_changed(fs::path const& path) {
+    std::lock_guard lock(changes_mutex_);
+    changed_ = true;
+    if (build_) {
+        changed_paths_.insert(fs::absolute(path).lexically_normal());
+    }
 }
 
 void WatchSession::update_watchers(SiteConfig const& config) {
@@ -45,7 +54,7 @@ void WatchSession::update_watchers(SiteConfig const& config) {
         !theme_watcher_ || !same_path(config.theme_dir, watched_config_.theme_dir);
     auto make_watcher = [this](fs::path const& directory) {
         return std::make_unique<FileWatcher>(directory,
-                                             [this](fs::path const&) { changed_.store(true); });
+                                             [this](fs::path const& path) { mark_changed(path); });
     };
     // Prepare both before replacing either existing watcher.
     auto content = content_changed ? make_watcher(config.content_dir) : nullptr;
@@ -64,13 +73,23 @@ SiteConfig const& WatchSession::preview_config() const {
 }
 
 void WatchSession::build_if_changed(OnBuild const& on_build) {
-    if (!changed_.exchange(false)) {
-        return;
+    std::set<fs::path> changes;
+    {
+        std::lock_guard lock(changes_mutex_);
+        if (!std::exchange(changed_, false)) {
+            return;
+        }
+        changes.swap(changed_paths_);
     }
     try {
         auto const candidate = load_config(request_);
         // Keep watching failed candidates so fixing a new input triggers recovery.
         update_watchers(candidate);
+        if (build_) {
+            build_(candidate, changes);
+            published_config_ = candidate;
+            return;
+        }
         auto const stats = build_site(candidate);
         bool const preview_changed =
             !published_config_ || !same_path(candidate.output_dir, published_config_->output_dir) ||
@@ -82,6 +101,8 @@ void WatchSession::build_if_changed(OnBuild const& on_build) {
             on_build(*published_config_);
         }
     } catch (std::exception const& error) {
+        std::lock_guard lock(changes_mutex_);
+        changed_paths_.merge(changes);
         spdlog::error("Build failed: {}", error.what());
     }
 }

@@ -27,7 +27,7 @@ class DevTests(BuilderFixture):
     def logs(self):
         return self.log_path.read_text(encoding="utf-8", errors="replace")
 
-    def start(self, command="serve", *args, configure=True, path="/"):
+    def start(self, command="serve", *args, configure=True, path="/", write_output=True):
         if configure:
             self.configure()
         with socket.socket() as probe:
@@ -39,9 +39,12 @@ class DevTests(BuilderFixture):
         command_args = [str(self.binary), command, *map(str, args)]
         if command == "serve":
             command_args.extend(["--port", str(self.port)])
+            if write_output:
+                command_args.append("--write-output")
         self.process = subprocess.Popen(command_args, cwd=self.root, stdout=log, stderr=subprocess.STDOUT)
         self.addCleanup(self.stop)
-        self.wait_for(lambda: (self.output / "index.html").is_file(), "initial build")
+        if command != "serve" or write_output:
+            self.wait_for(lambda: (self.output / "index.html").is_file(), "initial build")
         if command == "serve":
             self.wait_for(lambda: self.request(path)[0] == 200, "HTTP listener")
 
@@ -297,9 +300,10 @@ class DevTests(BuilderFixture):
         self.assert_no_temporary_directories()
 
     def test_incremental_preview_only_reloads_changed_output(self):
-        config = 'theme = "theme"\n[build]\nincremental = true\n'
+        config = ('theme = "theme"\n[build]\nincremental = true\n'
+                  '[build.images]\ncompress = true\n')
         self.configure(config)
-        self.start(configure=False)
+        self.start("serve", "--no-image-compression", configure=False)
         initial = self.version()
         self.configure(config + "# Editing a comment does not change the site.\n", atomic=True)
         self.wait_for(lambda: "output unchanged" in self.logs(), "unchanged incremental build")
@@ -308,6 +312,31 @@ class DevTests(BuilderFixture):
         self.write_page("posts/first.md", "First post", "Updated body.", atomic=True)
         self.wait_for_reload(initial)
         self.assertTrue(self.http_contains("/posts/first.html", "Updated body."))
+        self.assertNotIn("Images:", self.logs())
+
+    def test_fast_preview_publishes_pages_and_changed_assets_without_touching_dist(self):
+        self.configure('theme = "theme"\n[build.images]\ncompress = true\n')
+        static = self.content / "resource.txt"
+        static.write_bytes(b"original")
+        self.build()
+        published = self.snapshot()
+        self.start(configure=False, write_output=False)
+        initial = self.version()
+        self.write_page("posts/first.md", "First post", "New visible body.", atomic=True)
+        self.wait_for_reload(initial)
+        self.assertTrue(self.http_contains("/posts/first.html", "New visible body."))
+        self.assertIn("copied 0 asset(s)", self.logs())
+        self.assertEqual(self.snapshot(), published)
+
+        source = self.content / "posts/first.md"
+        source.write_text("Invalid metadata.", encoding="utf-8")
+        self.wait_for(lambda: "Build failed" in self.logs(), "broken preview")
+        static.write_bytes(b"modified")
+        self.assertEqual(self.request("/resource.txt")[2], b"original")
+        source.unlink()
+        self.wait_for(lambda: self.request("/resource.txt")[2] == b"modified", "updated asset")
+        self.assertEqual(self.request("/posts/first.html")[0], 404)
+        self.assertEqual(self.snapshot(), published)
 
     def test_failed_build_keeps_served_output_and_sends_no_reload_then_recovers(self):
         self.start()

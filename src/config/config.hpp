@@ -16,6 +16,7 @@ struct ConfigRequest {
     std::optional<std::filesystem::path> theme_dir;
     std::optional<std::filesystem::path> output_dir;
     std::optional<std::string> base_url;
+    bool disable_image_compression{false};
 };
 
 SiteConfig load_config(ConfigRequest const& request);

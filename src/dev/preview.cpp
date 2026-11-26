@@ -1,5 +1,6 @@
 #include "dev/preview.hpp"
 
+#include "build/builder.hpp"
 #include "dev/live_reload.hpp"
 #include "util/file.hpp"
 #include "util/path.hpp"
@@ -132,6 +133,39 @@ std::string inject_reload_script(std::string html, std::string_view local_path,
 void serve_file(httplib::Request const& request, std::string_view local_path,
                 httplib::Response& response, PreviewSnapshot const& snapshot) {
     response.status = 404;
+    if (snapshot.files) {
+        auto key = std::string(local_path.substr(1));
+        if (key.ends_with('/') || key.empty()) {
+            key += "index.html";
+        }
+        if (snapshot.files->directories.contains(key)) {
+            auto const query = request.target.find('?');
+            response.set_redirect(
+                encode_url_path(request.path) + "/" +
+                    (query == std::string::npos ? "" : request.target.substr(query)),
+                301);
+            return;
+        }
+        std::string contents;
+        if (auto const page = snapshot.files->generated.find(key);
+            page != snapshot.files->generated.end()) {
+            contents = *page->second;
+        } else if (auto const asset = snapshot.files->assets.find(key);
+                   asset != snapshot.files->assets.end()) {
+            contents = read_file(asset->second->cached);
+        } else {
+            return;
+        }
+        auto const type = httplib::detail::find_content_type(key, {}, "application/octet-stream");
+        response.status = 200;
+        if (type == "text/html") {
+            response.set_content(inject_reload_script(std::move(contents), local_path, snapshot),
+                                 "text/html; charset=utf-8");
+        } else {
+            response.set_content(std::move(contents), type);
+        }
+        return;
+    }
     auto const path = resolve_request_path(snapshot.output_dir, local_path);
     if (!path) {
         return;
